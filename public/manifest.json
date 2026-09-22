@@ -1,0 +1,25 @@
+{
+  "short_name": "Raghu CRM",
+  "name": "Raghu Real Estate CRM",
+  "description": "Comprehensive Real Estate and Property Management System",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#6C3BFF",
+  "theme_color": "#6C3BFF",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/"
+}
