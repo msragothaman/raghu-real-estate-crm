@@ -237,39 +237,90 @@ class CRMDataStore {
       this.state.isSyncing = true;
       this.notify();
 
-      // Upsert sites
+      // 1. Upsert users first so leads_assigned_user_id_fkey is satisfied
+      if (this.state.users.length > 0) {
+        const { error: usersErr } = await sb.from('users').upsert(this.state.users);
+        if (usersErr) console.warn(`Users upsert warning: ${usersErr.message}`);
+      }
+
+      // 2. Upsert sites
       if (this.state.sites.length > 0) {
         const { error: sitesErr } = await sb.from('sites').upsert(this.state.sites);
         if (sitesErr) throw new Error(`Sites: ${sitesErr.message}`);
       }
 
-      // Upsert channel partners
+      // 3. Upsert channel partners
       if (this.state.channelPartners.length > 0) {
         const { error: cpErr } = await sb.from('channel_partners').upsert(this.state.channelPartners);
         if (cpErr) throw new Error(`Channel Partners: ${cpErr.message}`);
       }
 
-      // Upsert leads
-      if (this.state.leads.length > 0) {
-        const { error: leadsErr } = await sb.from('leads').upsert(this.state.leads);
+      // Foreign key lookup sets
+      const validUserIds = new Set(this.state.users.map((u) => u.id));
+      const validSiteIds = new Set(this.state.sites.map((s) => s.id));
+      const validPartnerIds = new Set(this.state.channelPartners.map((cp) => cp.id));
+
+      // 4. Upsert leads (sanitizing foreign keys)
+      const sanitizedLeads = this.state.leads.map((l) => ({
+        ...l,
+        assigned_user_id:
+          l.assigned_user_id && validUserIds.has(l.assigned_user_id)
+            ? l.assigned_user_id
+            : null,
+        interested_site_id:
+          l.interested_site_id && validSiteIds.has(l.interested_site_id)
+            ? l.interested_site_id
+            : null,
+        assigned_channel_partner_id:
+          l.assigned_channel_partner_id && validPartnerIds.has(l.assigned_channel_partner_id)
+            ? l.assigned_channel_partner_id
+            : null,
+      }));
+
+      if (sanitizedLeads.length > 0) {
+        const { error: leadsErr } = await sb.from('leads').upsert(sanitizedLeads);
         if (leadsErr) throw new Error(`Leads: ${leadsErr.message}`);
       }
 
-      // Upsert plots
-      if (this.state.plots.length > 0) {
-        const { error: plotsErr } = await sb.from('plots').upsert(this.state.plots);
+      // 5. Upsert plots (sanitizing lead_id and site_id)
+      const validLeadIds = new Set(sanitizedLeads.map((l) => l.id));
+      const sanitizedPlots = this.state.plots.map((p) => ({
+        ...p,
+        lead_id: p.lead_id && validLeadIds.has(p.lead_id) ? p.lead_id : null,
+        site_id: validSiteIds.has(p.site_id) ? p.site_id : this.state.sites[0]?.id || p.site_id,
+      }));
+
+      if (sanitizedPlots.length > 0) {
+        const { error: plotsErr } = await sb.from('plots').upsert(sanitizedPlots);
         if (plotsErr) throw new Error(`Plots: ${plotsErr.message}`);
       }
 
-      // Upsert followups
-      if (this.state.followups.length > 0) {
-        const { error: fErr } = await sb.from('followups').upsert(this.state.followups);
+      // 6. Upsert followups (sanitizing lead_id and partner_id)
+      const sanitizedFollowups = this.state.followups
+        .filter((f) => validLeadIds.has(f.lead_id))
+        .map((f) => ({
+          ...f,
+          assigned_partner_id:
+            f.assigned_partner_id && validPartnerIds.has(f.assigned_partner_id)
+              ? f.assigned_partner_id
+              : null,
+        }));
+
+      if (sanitizedFollowups.length > 0) {
+        const { error: fErr } = await sb.from('followups').upsert(sanitizedFollowups);
         if (fErr) throw new Error(`Followups: ${fErr.message}`);
       }
 
-      // Upsert notes
-      if (this.state.notes.length > 0) {
-        const { error: nErr } = await sb.from('notes').upsert(this.state.notes);
+      // 7. Upsert notes (sanitizing lead_id and user_id)
+      const sanitizedNotes = this.state.notes
+        .filter((n) => validLeadIds.has(n.lead_id))
+        .map((n) => ({
+          ...n,
+          user_id: n.user_id && validUserIds.has(n.user_id) ? n.user_id : null,
+        }));
+
+      if (sanitizedNotes.length > 0) {
+        const { error: nErr } = await sb.from('notes').upsert(sanitizedNotes);
         if (nErr) throw new Error(`Notes: ${nErr.message}`);
       }
 

@@ -151,13 +151,30 @@ ALTER TABLE partner_assignment_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE followups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 
--- Allow read/write access policies
+-- Allow read/write access policies (idempotent)
+DROP POLICY IF EXISTS "Public sites policy" ON sites;
 CREATE POLICY "Public sites policy" ON sites FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public plots policy" ON plots;
 CREATE POLICY "Public plots policy" ON plots FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public leads policy" ON leads;
 CREATE POLICY "Public leads policy" ON leads FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public channel_partners policy" ON channel_partners;
 CREATE POLICY "Public channel_partners policy" ON channel_partners FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public status history policy" ON lead_status_history;
 CREATE POLICY "Public status history policy" ON lead_status_history FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public partner history policy" ON partner_assignment_history;
 CREATE POLICY "Public partner history policy" ON partner_assignment_history FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public followups policy" ON followups;
 CREATE POLICY "Public followups policy" ON followups FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public notes policy" ON notes;
 CREATE POLICY "Public notes policy" ON notes FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public users policy" ON users;
 CREATE POLICY "Public users policy" ON users FOR ALL USING (true);

@@ -17,6 +17,9 @@ import {
   ChevronUp,
   Database,
   Lock,
+  Sparkles,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { User, UserRole } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
@@ -110,6 +113,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       showToast('All CRM data synchronized successfully with cloud storage!', 'success');
     } else {
       showToast(res.message, 'info');
+    }
+  };
+
+  const handleCopySchema = async () => {
+    try {
+      const res = await fetch('/supabase/schema.sql');
+      const text = await res.text();
+      await navigator.clipboard.writeText(text);
+      showToast('Database SQL setup script copied to clipboard! Paste in Supabase SQL Editor and click Run.', 'success');
+    } catch {
+      showToast('Copy schema from supabase/schema.sql in the project root.', 'info');
     }
   };
 
@@ -407,6 +421,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>{supabaseConnected ? 'Cloud Active (Encrypted)' : 'Adaptive Offline Storage'}</span>
           </span>
         </div>
+
+        {!supabaseConnected && (
+          <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-2.5">
+            <div className="flex items-center gap-2 font-bold text-amber-900">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>One-Time Cloud Setup: Initialize Supabase Tables</span>
+            </div>
+            <p className="text-amber-800 leading-relaxed">
+              Your Supabase credentials in <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-[11px]">.env</code> are active. To enable cloud tables (<code className="bg-amber-100 px-1 py-0.5 rounded">sites</code>, <code className="bg-amber-100 px-1 py-0.5 rounded">plots</code>, <code className="bg-amber-100 px-1 py-0.5 rounded">leads</code>), run the SQL setup script once in your Supabase SQL Editor.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleCopySchema}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy SQL Setup Script</span>
+              </button>
+              <a
+                href="https://supabase.com/dashboard/project/fcfskctjhqcrjsoubpdw/sql/new"
+                target="_blank"
+                rel="noreferrer"
+                className="px-3.5 py-2 bg-white border border-amber-300 text-amber-900 font-bold rounded-xl hover:bg-amber-50 transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <span>Open Supabase SQL Editor</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        )}
 
         <div className="p-4 rounded-xl bg-[#FAF8FF] border border-[#E5DAFF] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
