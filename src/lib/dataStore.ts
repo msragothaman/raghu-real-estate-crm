@@ -52,26 +52,28 @@ class CRMDataStore {
   }
 
   private loadInitialState(): CRMState {
-    const saved = localStorage.getItem(this.storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return {
-          users: parsed.users || INITIAL_USERS,
-          currentUser: parsed.currentUser || INITIAL_USERS[0],
-          sites: parsed.sites || INITIAL_SITES,
-          plots: parsed.plots || INITIAL_PLOTS,
-          leads: parsed.leads || INITIAL_LEADS,
-          channelPartners: parsed.channelPartners || INITIAL_CHANNEL_PARTNERS,
-          followups: parsed.followups || INITIAL_FOLLOWUPS,
-          statusHistory: parsed.statusHistory || INITIAL_STATUS_HISTORY,
-          partnerHistory: parsed.partnerHistory || INITIAL_PARTNER_HISTORY,
-          notes: parsed.notes || INITIAL_NOTES,
-          supabaseConnected: false,
-        };
-      } catch (e) {
-        console.error('Failed to parse cached state', e);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = localStorage.getItem(this.storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            users: parsed.users || INITIAL_USERS,
+            currentUser: parsed.currentUser || INITIAL_USERS[0],
+            sites: parsed.sites || INITIAL_SITES,
+            plots: parsed.plots || INITIAL_PLOTS,
+            leads: parsed.leads || INITIAL_LEADS,
+            channelPartners: parsed.channelPartners || INITIAL_CHANNEL_PARTNERS,
+            followups: parsed.followups || INITIAL_FOLLOWUPS,
+            statusHistory: parsed.statusHistory || INITIAL_STATUS_HISTORY,
+            partnerHistory: parsed.partnerHistory || INITIAL_PARTNER_HISTORY,
+            notes: parsed.notes || INITIAL_NOTES,
+            supabaseConnected: false,
+          };
+        }
       }
+    } catch (e) {
+      console.warn('LocalStorage unavailable or parsing failed', e);
     }
 
     return {
@@ -90,7 +92,13 @@ class CRMDataStore {
   }
 
   private saveState() {
-    localStorage.setItem(this.storageKey, JSON.stringify(this.state));
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(this.storageKey, JSON.stringify(this.state));
+      }
+    } catch (e) {
+      console.warn('Failed to save state to localStorage', e);
+    }
     this.notify();
   }
 
