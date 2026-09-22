@@ -37,6 +37,8 @@ interface CRMState {
   partnerHistory: PartnerAssignmentHistory[];
   notes: LeadNote[];
   supabaseConnected: boolean;
+  isSyncing: boolean;
+  isAuthenticated: boolean;
 }
 
 type Listener = (state: CRMState) => void;
@@ -44,11 +46,11 @@ type Listener = (state: CRMState) => void;
 class CRMDataStore {
   private state: CRMState;
   private listeners: Set<Listener> = new Set();
-  private storageKey = 'raghu_crm_database_v1';
+  private storageKey = 'raghu_crm_database_v2';
 
   constructor() {
     this.state = this.loadInitialState();
-    this.checkSupabaseSync();
+    this.initSupabase();
   }
 
   private loadInitialState(): CRMState {
@@ -69,6 +71,8 @@ class CRMDataStore {
             partnerHistory: parsed.partnerHistory || INITIAL_PARTNER_HISTORY,
             notes: parsed.notes || INITIAL_NOTES,
             supabaseConnected: false,
+            isSyncing: false,
+            isAuthenticated: localStorage.getItem('raghu_crm_auth_session') === 'true',
           };
         }
       }
@@ -88,6 +92,8 @@ class CRMDataStore {
       partnerHistory: INITIAL_PARTNER_HISTORY,
       notes: INITIAL_NOTES,
       supabaseConnected: false,
+      isSyncing: false,
+      isAuthenticated: false,
     };
   }
 
@@ -118,7 +124,15 @@ class CRMDataStore {
     return this.state;
   }
 
-  public async checkSupabaseSync() {
+  // --- SUPABASE CLOUD SYNC & OPERATIONS ---
+  private async initSupabase() {
+    const isConnected = await this.checkSupabaseSync();
+    if (isConnected) {
+      await this.loadFromSupabase();
+    }
+  }
+
+  public async checkSupabaseSync(): Promise<boolean> {
     const { isConfigured } = getSupabaseCredentials();
     if (!isConfigured) {
       this.state.supabaseConnected = false;
@@ -134,19 +148,147 @@ class CRMDataStore {
     }
 
     try {
-      // Test querying sites
-      const { data, error } = await sb.from('sites').select('id').limit(1);
+      const { error } = await sb.from('sites').select('id').limit(1);
       if (!error) {
         this.state.supabaseConnected = true;
         this.notify();
         return true;
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.warn('Supabase test query failed', err);
     }
+
     this.state.supabaseConnected = false;
     this.notify();
     return false;
+  }
+
+  public async loadFromSupabase(): Promise<boolean> {
+    const sb = createSupabaseInstance();
+    if (!sb || !this.state.supabaseConnected) return false;
+
+    try {
+      this.state.isSyncing = true;
+      this.notify();
+
+      const [sitesRes, plotsRes, leadsRes, partnersRes, followupsRes, notesRes, shRes, phRes] =
+        await Promise.all([
+          sb.from('sites').select('*').order('created_at', { ascending: false }),
+          sb.from('plots').select('*'),
+          sb.from('leads').select('*').order('created_at', { ascending: false }),
+          sb.from('channel_partners').select('*'),
+          sb.from('followups').select('*'),
+          sb.from('notes').select('*'),
+          sb.from('lead_status_history').select('*'),
+          sb.from('partner_assignment_history').select('*'),
+        ]);
+
+      let hasSupabaseData = false;
+
+      if (sitesRes.data && sitesRes.data.length > 0) {
+        this.state.sites = sitesRes.data;
+        hasSupabaseData = true;
+      }
+      if (plotsRes.data && plotsRes.data.length > 0) {
+        this.state.plots = plotsRes.data;
+        hasSupabaseData = true;
+      }
+      if (leadsRes.data && leadsRes.data.length > 0) {
+        this.state.leads = leadsRes.data;
+        hasSupabaseData = true;
+      }
+      if (partnersRes.data && partnersRes.data.length > 0) {
+        this.state.channelPartners = partnersRes.data;
+        hasSupabaseData = true;
+      }
+      if (followupsRes.data && followupsRes.data.length > 0) {
+        this.state.followups = followupsRes.data;
+        hasSupabaseData = true;
+      }
+      if (notesRes.data && notesRes.data.length > 0) {
+        this.state.notes = notesRes.data;
+        hasSupabaseData = true;
+      }
+      if (shRes.data && shRes.data.length > 0) {
+        this.state.statusHistory = shRes.data;
+      }
+      if (phRes.data && phRes.data.length > 0) {
+        this.state.partnerHistory = phRes.data;
+      }
+
+      this.state.isSyncing = false;
+      this.saveState();
+      return hasSupabaseData;
+    } catch (err) {
+      console.error('Failed to load from Supabase:', err);
+      this.state.isSyncing = false;
+      this.notify();
+      return false;
+    }
+  }
+
+  public async pushAllToSupabase(): Promise<{ success: boolean; message: string }> {
+    const sb = createSupabaseInstance();
+    if (!sb) {
+      return { success: false, message: 'Supabase credentials not configured or invalid.' };
+    }
+
+    try {
+      this.state.isSyncing = true;
+      this.notify();
+
+      // Upsert sites
+      if (this.state.sites.length > 0) {
+        const { error: sitesErr } = await sb.from('sites').upsert(this.state.sites);
+        if (sitesErr) throw new Error(`Sites: ${sitesErr.message}`);
+      }
+
+      // Upsert channel partners
+      if (this.state.channelPartners.length > 0) {
+        const { error: cpErr } = await sb.from('channel_partners').upsert(this.state.channelPartners);
+        if (cpErr) throw new Error(`Channel Partners: ${cpErr.message}`);
+      }
+
+      // Upsert leads
+      if (this.state.leads.length > 0) {
+        const { error: leadsErr } = await sb.from('leads').upsert(this.state.leads);
+        if (leadsErr) throw new Error(`Leads: ${leadsErr.message}`);
+      }
+
+      // Upsert plots
+      if (this.state.plots.length > 0) {
+        const { error: plotsErr } = await sb.from('plots').upsert(this.state.plots);
+        if (plotsErr) throw new Error(`Plots: ${plotsErr.message}`);
+      }
+
+      // Upsert followups
+      if (this.state.followups.length > 0) {
+        const { error: fErr } = await sb.from('followups').upsert(this.state.followups);
+        if (fErr) throw new Error(`Followups: ${fErr.message}`);
+      }
+
+      // Upsert notes
+      if (this.state.notes.length > 0) {
+        const { error: nErr } = await sb.from('notes').upsert(this.state.notes);
+        if (nErr) throw new Error(`Notes: ${nErr.message}`);
+      }
+
+      this.state.isSyncing = false;
+      this.state.supabaseConnected = true;
+      this.saveState();
+      return {
+        success: true,
+        message: `Successfully uploaded ${this.state.sites.length} sites, ${this.state.plots.length} plots, ${this.state.leads.length} leads, and ${this.state.channelPartners.length} partners to Supabase!`,
+      };
+    } catch (err: any) {
+      console.error('Error pushing data to Supabase:', err);
+      this.state.isSyncing = false;
+      this.notify();
+      return {
+        success: false,
+        message: `Upload error: ${err.message || 'Check your Supabase tables and schema.sql.'}`,
+      };
+    }
   }
 
   public resetToDefaultSeedData() {
@@ -163,11 +305,13 @@ class CRMDataStore {
       partnerHistory: INITIAL_PARTNER_HISTORY,
       notes: INITIAL_NOTES,
       supabaseConnected: this.state.supabaseConnected,
+      isSyncing: false,
+      isAuthenticated: this.state.isAuthenticated,
     };
     this.saveState();
   }
 
-  // --- CURRENT USER / ROLE SWITCHING ---
+  // --- USER ROLE ---
   public setCurrentUserRole(role: UserRole) {
     const user = this.state.users.find((u) => u.role === role) || {
       ...this.state.currentUser,
@@ -177,7 +321,23 @@ class CRMDataStore {
     this.saveState();
   }
 
-  // --- SITES ---
+  public updateCurrentUser(updates: Partial<User>) {
+    this.state.currentUser = {
+      ...this.state.currentUser,
+      ...updates,
+    };
+    this.state.users = this.state.users.map((u) =>
+      u.id === this.state.currentUser.id ? { ...u, ...updates } : u
+    );
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('raghu_crm_current_user', JSON.stringify(this.state.currentUser));
+      }
+    } catch (e) {}
+    this.saveState();
+  }
+
+  // --- SITES (CRUD) ---
   public addSite(siteData: Omit<Site, 'id' | 'created_at' | 'updated_at'>): Site {
     const newSite: Site = {
       ...siteData,
@@ -187,17 +347,46 @@ class CRMDataStore {
     };
     this.state.sites.unshift(newSite);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('sites').insert(newSite).then(({ error }) => {
+        if (error) console.warn('Supabase site insert failed:', error);
+      });
+    }
+
     return newSite;
   }
 
   public updateSite(id: string, updates: Partial<Site>) {
+    const updated = { ...updates, updated_at: new Date().toISOString() };
     this.state.sites = this.state.sites.map((site) =>
-      site.id === id ? { ...site, ...updates, updated_at: new Date().toISOString() } : site
+      site.id === id ? { ...site, ...updated } : site
     );
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('sites').update(updated).eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase site update failed:', error);
+      });
+    }
   }
 
-  // --- PLOTS ---
+  public deleteSite(id: string) {
+    this.state.sites = this.state.sites.filter((s) => s.id !== id);
+    this.state.plots = this.state.plots.filter((p) => p.site_id !== id);
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('sites').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase site delete failed:', error);
+      });
+    }
+  }
+
+  // --- PLOTS (CRUD) ---
   public addPlot(plotData: Omit<Plot, 'id' | 'created_at' | 'updated_at'>): Plot {
     const newPlot: Plot = {
       ...plotData,
@@ -207,7 +396,28 @@ class CRMDataStore {
     };
     this.state.plots.push(newPlot);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('plots').insert(newPlot).then(({ error }) => {
+        if (error) console.warn('Supabase plot insert failed:', error);
+      });
+    }
+
     return newPlot;
+  }
+
+  public updatePlot(id: string, updates: Partial<Plot>) {
+    const updated = { ...updates, updated_at: new Date().toISOString() };
+    this.state.plots = this.state.plots.map((p) => (p.id === id ? { ...p, ...updated } : p));
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('plots').update(updated).eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase plot update failed:', error);
+      });
+    }
   }
 
   public updatePlotStatus(
@@ -219,26 +429,46 @@ class CRMDataStore {
     price?: number
   ) {
     const today = new Date().toISOString().split('T')[0];
-    this.state.plots = this.state.plots.map((p) => {
-      if (p.id === plotId) {
-        return {
-          ...p,
-          status,
-          customer_name: customerName !== undefined ? customerName : p.customer_name,
-          lead_id: leadId !== undefined ? leadId : p.lead_id,
-          notes: notes !== undefined ? notes : p.notes,
-          price: price !== undefined ? price : p.price,
-          booking_date: status === 'BOOKED' ? today : p.booking_date,
-          registration_date: status === 'REGISTRATION COMPLETED' ? today : p.registration_date,
-          updated_at: new Date().toISOString(),
-        };
-      }
-      return p;
-    });
+    const plot = this.state.plots.find((p) => p.id === plotId);
+    if (!plot) return;
+
+    const updatedFields: Partial<Plot> = {
+      status,
+      customer_name: customerName !== undefined ? customerName : plot.customer_name,
+      lead_id: leadId !== undefined ? leadId : plot.lead_id,
+      notes: notes !== undefined ? notes : plot.notes,
+      price: price !== undefined ? price : plot.price,
+      booking_date: status === 'BOOKED' ? today : plot.booking_date,
+      registration_date: status === 'REGISTRATION COMPLETED' ? today : plot.registration_date,
+      updated_at: new Date().toISOString(),
+    };
+
+    this.state.plots = this.state.plots.map((p) =>
+      p.id === plotId ? { ...p, ...updatedFields } : p
+    );
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('plots').update(updatedFields).eq('id', plotId).then(({ error }) => {
+        if (error) console.warn('Supabase plot status update failed:', error);
+      });
+    }
   }
 
-  // --- LEADS ---
+  public deletePlot(id: string) {
+    this.state.plots = this.state.plots.filter((p) => p.id !== id);
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('plots').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase plot delete failed:', error);
+      });
+    }
+  }
+
+  // --- LEADS (CRUD) ---
   public addLead(leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>): Lead {
     const newLead: Lead = {
       ...leadData,
@@ -248,30 +478,60 @@ class CRMDataStore {
     };
     this.state.leads.unshift(newLead);
 
-    // Record initial status in history
-    this.state.statusHistory.unshift({
+    // Initial status history
+    const shEntry: LeadStatusHistory = {
       id: `sh-${Date.now()}`,
       lead_id: newLead.id,
       old_status: undefined,
       new_status: newLead.status,
       changed_by: this.state.currentUser.name,
       changed_at: new Date().toISOString(),
-    });
+    };
+    this.state.statusHistory.unshift(shEntry);
 
-    // Record initial partner assignment if any
+    // Initial partner history
+    let pahEntry: PartnerAssignmentHistory | null = null;
     if (newLead.assigned_channel_partner_id) {
-      this.state.partnerHistory.unshift({
+      pahEntry = {
         id: `pah-${Date.now()}`,
         lead_id: newLead.id,
         old_partner_id: null,
         new_partner_id: newLead.assigned_channel_partner_id,
         changed_by: this.state.currentUser.name,
         changed_at: new Date().toISOString(),
-      });
+      };
+      this.state.partnerHistory.unshift(pahEntry);
     }
 
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('leads').insert(newLead).then(({ error }) => {
+        if (error) console.warn('Supabase lead insert failed:', error);
+      });
+      sb.from('lead_status_history').insert(shEntry).then();
+      if (pahEntry) {
+        sb.from('partner_assignment_history').insert(pahEntry).then();
+      }
+    }
+
     return newLead;
+  }
+
+  public updateLead(leadId: string, updates: Partial<Lead>) {
+    const updated = { ...updates, updated_at: new Date().toISOString() };
+    this.state.leads = this.state.leads.map((l) =>
+      l.id === leadId ? { ...l, ...updated } : l
+    );
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('leads').update(updated).eq('id', leadId).then(({ error }) => {
+        if (error) console.warn('Supabase lead update failed:', error);
+      });
+    }
   }
 
   public updateLeadStatus(leadId: string, newStatus: LeadStatus) {
@@ -279,20 +539,28 @@ class CRMDataStore {
     if (!lead || lead.status === newStatus) return;
 
     const oldStatus = lead.status;
+    const updated = { status: newStatus, updated_at: new Date().toISOString() };
+
     this.state.leads = this.state.leads.map((l) =>
-      l.id === leadId ? { ...l, status: newStatus, updated_at: new Date().toISOString() } : l
+      l.id === leadId ? { ...l, ...updated } : l
     );
 
-    this.state.statusHistory.unshift({
+    const shEntry: LeadStatusHistory = {
       id: `sh-${Date.now()}`,
       lead_id: leadId,
       old_status: oldStatus,
       new_status: newStatus,
       changed_by: this.state.currentUser.name,
       changed_at: new Date().toISOString(),
-    });
-
+    };
+    this.state.statusHistory.unshift(shEntry);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('leads').update(updated).eq('id', leadId).then();
+      sb.from('lead_status_history').insert(shEntry).then();
+    }
   }
 
   public reassignLeadPartner(leadId: string, newPartnerId: string | null) {
@@ -300,32 +568,45 @@ class CRMDataStore {
     if (!lead || lead.assigned_channel_partner_id === newPartnerId) return;
 
     const oldPartnerId = lead.assigned_channel_partner_id;
+    const updated = { assigned_channel_partner_id: newPartnerId, updated_at: new Date().toISOString() };
+
     this.state.leads = this.state.leads.map((l) =>
-      l.id === leadId
-        ? { ...l, assigned_channel_partner_id: newPartnerId, updated_at: new Date().toISOString() }
-        : l
+      l.id === leadId ? { ...l, ...updated } : l
     );
 
-    this.state.partnerHistory.unshift({
+    const pahEntry: PartnerAssignmentHistory = {
       id: `pah-${Date.now()}`,
       lead_id: leadId,
       old_partner_id: oldPartnerId,
       new_partner_id: newPartnerId,
       changed_by: this.state.currentUser.name,
       changed_at: new Date().toISOString(),
-    });
-
+    };
+    this.state.partnerHistory.unshift(pahEntry);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('leads').update(updated).eq('id', leadId).then();
+      sb.from('partner_assignment_history').insert(pahEntry).then();
+    }
   }
 
-  public updateLead(leadId: string, updates: Partial<Lead>) {
-    this.state.leads = this.state.leads.map((l) =>
-      l.id === leadId ? { ...l, ...updates, updated_at: new Date().toISOString() } : l
-    );
+  public deleteLead(leadId: string) {
+    this.state.leads = this.state.leads.filter((l) => l.id !== leadId);
+    this.state.followups = this.state.followups.filter((f) => f.lead_id !== leadId);
+    this.state.notes = this.state.notes.filter((n) => n.lead_id !== leadId);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('leads').delete().eq('id', leadId).then(({ error }) => {
+        if (error) console.warn('Supabase lead delete failed:', error);
+      });
+    }
   }
 
-  // --- CHANNEL PARTNERS ---
+  // --- CHANNEL PARTNERS (CRUD) ---
   public addChannelPartner(partnerData: Omit<ChannelPartner, 'id' | 'created_at' | 'updated_at'>): ChannelPartner {
     const newPartner: ChannelPartner = {
       ...partnerData,
@@ -335,17 +616,49 @@ class CRMDataStore {
     };
     this.state.channelPartners.push(newPartner);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('channel_partners').insert(newPartner).then(({ error }) => {
+        if (error) console.warn('Supabase partner insert failed:', error);
+      });
+    }
+
     return newPartner;
   }
 
   public updateChannelPartner(id: string, updates: Partial<ChannelPartner>) {
+    const updated = { ...updates, updated_at: new Date().toISOString() };
     this.state.channelPartners = this.state.channelPartners.map((cp) =>
-      cp.id === id ? { ...cp, ...updates, updated_at: new Date().toISOString() } : cp
+      cp.id === id ? { ...cp, ...updated } : cp
     );
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('channel_partners').update(updated).eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase partner update failed:', error);
+      });
+    }
   }
 
-  // --- FOLLOW-UPS ---
+  public deleteChannelPartner(id: string) {
+    this.state.channelPartners = this.state.channelPartners.filter((cp) => cp.id !== id);
+    // Unassign partner from leads
+    this.state.leads = this.state.leads.map((l) =>
+      l.assigned_channel_partner_id === id ? { ...l, assigned_channel_partner_id: null } : l
+    );
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('channel_partners').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase partner delete failed:', error);
+      });
+    }
+  }
+
+  // --- FOLLOW-UPS (CRUD) ---
   public addFollowUp(data: Omit<FollowUp, 'id' | 'created_at' | 'updated_at'>): FollowUp {
     const newFollowUp: FollowUp = {
       ...data,
@@ -356,33 +669,58 @@ class CRMDataStore {
     };
     this.state.followups.unshift(newFollowUp);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('followups').insert(newFollowUp).then(({ error }) => {
+        if (error) console.warn('Supabase followup insert failed:', error);
+      });
+    }
+
     return newFollowUp;
   }
 
-  public updateFollowUpStatus(id: string, status: FollowUp['status']) {
+  public updateFollowUp(id: string, updates: Partial<FollowUp>) {
+    const updated = { ...updates, updated_at: new Date().toISOString() };
     this.state.followups = this.state.followups.map((f) =>
-      f.id === id ? { ...f, status, updated_at: new Date().toISOString() } : f
+      f.id === id ? { ...f, ...updated } : f
     );
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('followups').update(updated).eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase followup update failed:', error);
+      });
+    }
+  }
+
+  public updateFollowUpStatus(id: string, status: FollowUp['status']) {
+    this.updateFollowUp(id, { status });
   }
 
   public rescheduleFollowUp(id: string, date: string, time: string, notes?: string) {
-    this.state.followups = this.state.followups.map((f) =>
-      f.id === id
-        ? {
-            ...f,
-            followup_date: date,
-            followup_time: time,
-            notes: notes || f.notes,
-            status: 'Pending',
-            updated_at: new Date().toISOString(),
-          }
-        : f
-    );
-    this.saveState();
+    this.updateFollowUp(id, {
+      followup_date: date,
+      followup_time: time,
+      notes,
+      status: 'Pending',
+    });
   }
 
-  // --- NOTES ---
+  public deleteFollowUp(id: string) {
+    this.state.followups = this.state.followups.filter((f) => f.id !== id);
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('followups').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Supabase followup delete failed:', error);
+      });
+    }
+  }
+
+  // --- NOTES (CRUD) ---
   public addNote(leadId: string, noteText: string): LeadNote {
     const newNote: LeadNote = {
       id: `note-${Date.now()}`,
@@ -394,10 +732,28 @@ class CRMDataStore {
     };
     this.state.notes.unshift(newNote);
     this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('notes').insert(newNote).then(({ error }) => {
+        if (error) console.warn('Supabase note insert failed:', error);
+      });
+    }
+
     return newNote;
   }
 
-  // --- COMPUTED / REPORTING HELPERS ---
+  public deleteNote(id: string) {
+    this.state.notes = this.state.notes.filter((n) => n.id !== id);
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('notes').delete().eq('id', id).then();
+    }
+  }
+
+  // --- COMPUTED HELPERS ---
   public getDashboardStats() {
     const { sites, plots, leads, channelPartners, followups } = this.state;
 
@@ -409,7 +765,6 @@ class CRMDataStore {
     const newLeads = leads.filter((l) => l.status === 'NEW').length;
     const activePartners = channelPartners.filter((cp) => cp.status === 'ACTIVE').length;
 
-    // Follow-ups due (Pending and date <= today)
     const today = new Date().toISOString().split('T')[0];
     const followupsDue = followups.filter((f) => f.status === 'Pending' && f.followup_date <= today).length;
 
@@ -457,6 +812,31 @@ class CRMDataStore {
       siteVisits,
       conversionRate,
     };
+  }
+
+  // --- AUTH METHODS ---
+  public login(user?: User) {
+    if (user) {
+      this.state.currentUser = user;
+    }
+    this.state.isAuthenticated = true;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('raghu_crm_auth_session', 'true');
+        localStorage.setItem('raghu_crm_current_user', JSON.stringify(this.state.currentUser));
+      }
+    } catch (e) {}
+    this.saveState();
+  }
+
+  public logout() {
+    this.state.isAuthenticated = false;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('raghu_crm_auth_session');
+      }
+    } catch (e) {}
+    this.saveState();
   }
 }
 

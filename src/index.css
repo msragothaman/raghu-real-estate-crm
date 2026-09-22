@@ -5,35 +5,36 @@
 @layer base {
   :root {
     --brand-primary: #6C3BFF;
-    --brand-dark: #4B1FB8;
-    --brand-light: #F3EFFF;
-    --brand-bg: #F8F8FC;
+    --brand-dark: #4714BA;
+    --brand-deep: #2A086E;
+    --brand-light: #F5F0FF;
+    --brand-bg: #F7F3FF;
   }
 
   body {
-    background-color: #F8F8FC;
-    color: #1e293b;
+    background-color: #F7F3FF;
+    color: #1a1033;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
 }
 
-/* Custom modern scrollbars */
+/* Custom pure purple scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #F5F0FF;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #C7ACFF;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #6C3BFF;
 }
 
 /* Hide scrollbar for clean horizontal Kanban */

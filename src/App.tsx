@@ -14,6 +14,7 @@ import { AddLeadModal } from './components/leads/AddLeadModal';
 import { AddSiteModal } from './components/sites/AddSiteModal';
 import { AddFollowUpModal } from './components/leads/AddFollowUpModal';
 import { ToastProvider } from './components/common/Toast';
+import { SignInPage } from './components/auth/SignInPage';
 import { dataStore } from './lib/dataStore';
 import { Site, Lead, ChannelPartner } from './types/crm';
 
@@ -23,14 +24,18 @@ export const AppContent: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Drill-down selection states
-  const [selectedSite, setSelectedSite] = useState<Site | null>(null);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  // Drill-down selection states (tracked by ID so edits reflect instantly across views)
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [calendarInitialTab, setCalendarInitialTab] = useState<string | undefined>(undefined);
   const [leadPipelineStatusFilter, setLeadPipelineStatusFilter] = useState<string | undefined>(
     undefined
   );
+
+  // Dynamically resolve active site and lead from reactive storeState
+  const selectedSite = storeState.sites.find((s) => s.id === selectedSiteId) || null;
+  const selectedLead = storeState.leads.find((l) => l.id === selectedLeadId) || null;
 
   // Global modal triggers
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
@@ -68,16 +73,32 @@ export const AppContent: React.FC = () => {
   };
 
   const handleSelectSite = (site: Site) => {
-    setSelectedSite(site);
+    setSelectedSiteId(site.id);
     setCurrentTab('sites');
   };
 
   const handleSelectLead = (lead: Lead) => {
-    setSelectedLead(lead);
+    setSelectedLeadId(lead.id);
     // If not on leads tab, we can still show the drawer or switch tab
     if (currentTab !== 'leads') {
       setCurrentTab('leads');
     }
+  };
+
+  // If not authenticated, require Sign In before entering SaaS
+  if (!storeState.isAuthenticated) {
+    return (
+      <SignInPage
+        availableUsers={storeState.users}
+        onLoginSuccess={() => {
+          // Handled reactively
+        }}
+      />
+    );
+  }
+
+  const handleSignOut = () => {
+    dataStore.logout();
   };
 
   return (
@@ -88,13 +109,14 @@ export const AppContent: React.FC = () => {
           currentTab={currentTab}
           onSelectTab={(tab) => {
             setCurrentTab(tab);
-            if (tab === 'sites') setSelectedSite(null);
+            if (tab === 'sites') setSelectedSiteId(null);
             if (tab === 'partners') setSelectedPartnerId(null);
           }}
           onOpenAddLead={() => setIsAddLeadOpen(true)}
           leadCount={storeState.leads.length}
           followupsDueCount={stats.followupsDue}
           supabaseConnected={storeState.supabaseConnected}
+          onSignOut={handleSignOut}
         />
       </div>
 
@@ -105,7 +127,7 @@ export const AppContent: React.FC = () => {
         currentTab={currentTab}
         onSelectTab={(tab) => {
           setCurrentTab(tab);
-          if (tab === 'sites') setSelectedSite(null);
+          if (tab === 'sites') setSelectedSiteId(null);
           if (tab === 'partners') setSelectedPartnerId(null);
         }}
         onOpenAddLead={() => setIsAddLeadOpen(true)}
@@ -124,6 +146,7 @@ export const AppContent: React.FC = () => {
           onOpenAddFollowup={() => setIsAddFollowupOpen(true)}
           onOpenAddSite={() => setIsAddSiteOpen(true)}
           followupsDueCount={stats.followupsDue}
+          onSignOut={handleSignOut}
         />
 
         {/* Dynamic Main View Area */}
@@ -147,14 +170,14 @@ export const AppContent: React.FC = () => {
                 site={selectedSite}
                 allPlots={storeState.plots}
                 leads={storeState.leads}
-                onBack={() => setSelectedSite(null)}
+                onBack={() => setSelectedSiteId(null)}
                 onSelectLead={handleSelectLead}
               />
             ) : (
               <SiteList
                 sites={storeState.sites}
                 plots={storeState.plots}
-                onSelectSite={(site) => setSelectedSite(site)}
+                onSelectSite={(site) => setSelectedSiteId(site.id)}
                 isAddModalOpen={isAddSiteOpen}
                 setIsAddModalOpen={setIsAddSiteOpen}
               />
@@ -175,7 +198,7 @@ export const AppContent: React.FC = () => {
               isAddLeadOpen={isAddLeadOpen}
               setIsAddLeadOpen={setIsAddLeadOpen}
               selectedLead={selectedLead}
-              setSelectedLead={setSelectedLead}
+              setSelectedLead={(lead) => setSelectedLeadId(lead ? lead.id : null)}
             />
           )}
 

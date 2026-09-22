@@ -1,22 +1,26 @@
 import React, { useState } from 'react';
 import {
-  Settings,
-  Database,
-  ShieldAlert,
+  User as UserIcon,
   Building,
-  Key,
-  Copy,
-  Check,
-  RefreshCw,
-  ExternalLink,
-  Save,
+  Bell,
   CheckCircle2,
-  AlertTriangle,
+  Save,
+  Shield,
+  Phone,
+  Mail,
+  Briefcase,
+  MapPin,
+  RefreshCw,
+  UploadCloud,
+  DownloadCloud,
+  ChevronDown,
+  ChevronUp,
+  Database,
+  Lock,
 } from 'lucide-react';
 import { User, UserRole } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
 import { useToast } from '../common/Toast';
-import { getSupabaseCredentials } from '../../lib/supabase';
 
 interface SettingsViewProps {
   currentUser: User;
@@ -28,96 +32,371 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   supabaseConnected,
 }) => {
   const { showToast } = useToast();
-  const creds = getSupabaseCredentials();
 
-  const [supabaseUrl, setSupabaseUrl] = useState(creds.url);
-  const [supabaseKey, setSupabaseKey] = useState(creds.key);
-  const [copiedSchema, setCopiedSchema] = useState(false);
-  const [testingConnection, setTestingConnection] = useState(false);
+  // User Profile Form State
+  const [name, setName] = useState(currentUser.name);
+  const [email, setEmail] = useState(currentUser.email);
+  const [phone, setPhone] = useState(currentUser.phone || '+91 98401 23456');
+  const [designation, setDesignation] = useState(
+    currentUser.role === 'ADMIN'
+      ? 'Managing Director'
+      : currentUser.role === 'SALES USER'
+      ? 'Senior Sales Manager'
+      : 'Channel Partner Agency Head'
+  );
 
-  // Organization info
-  const [orgName, setOrgName] = useState('Raghu Real Estate Developers Pvt Ltd');
-  const [orgGst, setOrgGst] = useState('33AABCR1234F1Z9');
-  const [orgPhone, setOrgPhone] = useState('+91 98401 23456');
+  // Organization Info State
+  const [orgName, setOrgName] = useState(() => {
+    return localStorage.getItem('raghu_crm_org_name') || 'Raghu Real Estate Developers Pvt Ltd';
+  });
+  const [orgGst, setOrgGst] = useState(() => {
+    return localStorage.getItem('raghu_crm_org_gst') || '33AABCR1234F1Z9 (TN/RERA/2026/0412)';
+  });
+  const [orgPhone, setOrgPhone] = useState(() => {
+    return localStorage.getItem('raghu_crm_org_phone') || '+91 98400 11223';
+  });
+  const [orgAddress, setOrgAddress] = useState(() => {
+    return (
+      localStorage.getItem('raghu_crm_org_address') ||
+      'No. 42, Anna Salai, Guindy, Chennai, Tamil Nadu - 600032'
+    );
+  });
 
-  const handleSaveSupabase = async (e: React.FormEvent) => {
+  // Notification Preferences State
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(true);
+  const [notifyFollowups, setNotifyFollowups] = useState(true);
+  const [autoAssignLeads, setAutoAssignLeads] = useState(true);
+
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Save User Profile
+  const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('raghu_crm_supabase_url', supabaseUrl.trim());
-    localStorage.setItem('raghu_crm_supabase_key', supabaseKey.trim());
+    if (!name.trim()) {
+      showToast('Name cannot be empty', 'error');
+      return;
+    }
 
-    setTestingConnection(true);
-    const success = await dataStore.checkSupabaseSync();
-    setTestingConnection(false);
+    dataStore.updateCurrentUser({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+    });
 
-    if (success) {
-      showToast('Supabase credentials saved! Live connection active.', 'success');
+    showToast('User profile updated successfully!', 'success');
+  };
+
+  // Save Organization Details
+  const handleSaveOrg = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('raghu_crm_org_name', orgName.trim());
+    localStorage.setItem('raghu_crm_org_gst', orgGst.trim());
+    localStorage.setItem('raghu_crm_org_phone', orgPhone.trim());
+    localStorage.setItem('raghu_crm_org_address', orgAddress.trim());
+
+    showToast('Company details saved successfully!', 'success');
+  };
+
+  // Cloud Sync Handler
+  const handleSyncCloud = async () => {
+    setIsSyncing(true);
+    const res = await dataStore.pushAllToSupabase();
+    await dataStore.loadFromSupabase();
+    setIsSyncing(false);
+
+    if (res.success) {
+      showToast('All CRM data synchronized successfully with cloud storage!', 'success');
     } else {
-      showToast(
-        'Supabase credentials saved. Operating in adaptive fallback until tables are reachable.',
-        'info'
-      );
-    }
-  };
-
-  const handleCopySchema = async () => {
-    try {
-      const response = await fetch('/supabase/schema.sql');
-      let sqlText = '';
-      if (response.ok) {
-        sqlText = await response.text();
-      } else {
-        sqlText = `-- Copy schema from supabase/schema.sql in the project directory`;
-      }
-      await navigator.clipboard.writeText(sqlText);
-      setCopiedSchema(true);
-      showToast('SQL Schema copied to clipboard!', 'success');
-      setTimeout(() => setCopiedSchema(false), 3000);
-    } catch {
-      showToast('Please copy schema from supabase/schema.sql directly.', 'info');
-    }
-  };
-
-  const handleResetData = () => {
-    if (
-      window.confirm(
-        'Are you sure you want to reset all data back to original realistic seed plots and leads?'
-      )
-    ) {
-      dataStore.resetToDefaultSeedData();
-      showToast('Data store reset to initial demonstration state.', 'success');
+      showToast(res.message, 'info');
     }
   };
 
   return (
     <div className="max-w-4xl space-y-6 animate-in fade-in duration-200">
-      {/* Header */}
+      {/* Page Header */}
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900">CRM & Database Settings</h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Manage Supabase cloud connection, user permissions, and company profile
+        <h2 className="text-xl sm:text-2xl font-black text-purple-950">Account & System Settings</h2>
+        <p className="text-xs text-purple-600/80 mt-0.5">
+          Manage your personal profile, company details, and application preferences
         </p>
       </div>
 
-      {/* Supabase Cloud Database Section */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
-        <div className="flex items-center justify-between">
+      {/* 1. USER PROFILE SETTINGS */}
+      <div className="bg-white rounded-2xl border border-[#DFD0FF] shadow-xs overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-[#F0E8FF] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6C3BFF] to-[#9965FF] text-white flex items-center justify-center font-black text-lg shadow-md shadow-[#6C3BFF]/25">
+              {currentUser.name.charAt(0)}
+            </div>
+            <div>
+              <h3 className="text-base font-black text-purple-950">My Profile</h3>
+              <p className="text-xs text-purple-600/80">
+                Update your display name, contact information, and role
+              </p>
+            </div>
+          </div>
+
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-100 text-[#6C3BFF] border border-purple-200">
+            {currentUser.role}
+          </span>
+        </div>
+
+        <form onSubmit={handleSaveProfile} className="p-5 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* User Name */}
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Full Name *
+              </label>
+              <div className="relative">
+                <UserIcon className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your Name"
+                  required
+                  className="w-full bg-[#FAF8FF] focus:bg-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] focus:ring-2 focus:ring-[#6C3BFF]/20 text-purple-950 font-bold transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Email Address */}
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Email Address *
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  required
+                  className="w-full bg-[#FAF8FF] focus:bg-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] focus:ring-2 focus:ring-[#6C3BFF]/20 text-purple-950 font-medium transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Phone Number */}
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Phone Number / WhatsApp
+              </label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98401 23456"
+                  className="w-full bg-[#FAF8FF] focus:bg-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] focus:ring-2 focus:ring-[#6C3BFF]/20 text-purple-950 font-medium transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Designation / Job Title */}
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Designation / Job Title
+              </label>
+              <div className="relative">
+                <Briefcase className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={designation}
+                  onChange={(e) => setDesignation(e.target.value)}
+                  placeholder="e.g. Senior Sales Manager"
+                  className="w-full bg-[#FAF8FF] focus:bg-white text-sm pl-10 pr-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] focus:ring-2 focus:ring-[#6C3BFF]/20 text-purple-950 font-medium transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#6C3BFF] hover:bg-[#5820E0] text-white text-xs font-bold rounded-xl shadow-md shadow-[#6C3BFF]/30 transition-all cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save Profile Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* 2. COMPANY & ORGANIZATION SETTINGS */}
+      <div className="bg-white rounded-2xl border border-[#DFD0FF] shadow-xs overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-[#F0E8FF] flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-purple-100 text-[#6C3BFF]">
+            <Building className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-purple-950">Company & Developer Profile</h3>
+            <p className="text-xs text-purple-600/80">
+              Branding and legal registration shown on customer receipts and reports
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveOrg} className="p-5 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Company / Developer Name
+              </label>
+              <input
+                type="text"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                className="w-full bg-[#FAF8FF] focus:bg-white text-sm px-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] text-purple-950 font-bold transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                GST / RERA Registration No.
+              </label>
+              <input
+                type="text"
+                value={orgGst}
+                onChange={(e) => setOrgGst(e.target.value)}
+                className="w-full bg-[#FAF8FF] focus:bg-white text-sm px-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] text-purple-950 font-medium transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Head Office Phone
+              </label>
+              <input
+                type="text"
+                value={orgPhone}
+                onChange={(e) => setOrgPhone(e.target.value)}
+                className="w-full bg-[#FAF8FF] focus:bg-white text-sm px-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] text-purple-950 font-medium transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Primary Currency & Timezone
+              </label>
+              <div className="p-2.5 bg-[#FAF8FF] rounded-xl border border-[#DFD0FF] text-xs font-bold text-purple-950 flex items-center justify-between">
+                <span>₹ INR (Indian Rupee)</span>
+                <span className="text-purple-500 font-normal">Asia/Kolkata (IST +5:30)</span>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-purple-950 uppercase tracking-wider mb-1.5">
+                Registered Office Address
+              </label>
+              <input
+                type="text"
+                value={orgAddress}
+                onChange={(e) => setOrgAddress(e.target.value)}
+                className="w-full bg-[#FAF8FF] focus:bg-white text-sm px-4 py-2.5 rounded-xl border border-[#DFD0FF] focus:outline-none focus:border-[#6C3BFF] text-purple-950 font-medium transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#6C3BFF] hover:bg-[#5820E0] text-white text-xs font-bold rounded-xl shadow-md shadow-[#6C3BFF]/30 transition-all cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save Company Details</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* 3. NOTIFICATION & AUTOMATION PREFERENCES */}
+      <div className="bg-white rounded-2xl border border-[#DFD0FF] shadow-xs p-5 sm:p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-purple-100 text-[#6C3BFF]">
+            <Bell className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-purple-950">Notifications & Preferences</h3>
+            <p className="text-xs text-purple-600/80">
+              Configure automated lead alerts and follow-up reminders
+            </p>
+          </div>
+        </div>
+
+        <div className="divide-y divide-[#F0E8FF] text-xs">
+          <div className="py-3 flex items-center justify-between">
+            <div>
+              <p className="font-bold text-purple-950">WhatsApp Lead Notifications</p>
+              <p className="text-purple-600/80 mt-0.5">
+                Receive instant check-in notifications for new incoming Meta and Google enquiries
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={notifyWhatsapp}
+              onChange={(e) => setNotifyWhatsapp(e.target.checked)}
+              className="w-4 h-4 rounded text-[#6C3BFF] accent-[#6C3BFF] cursor-pointer"
+            />
+          </div>
+
+          <div className="py-3 flex items-center justify-between">
+            <div>
+              <p className="font-bold text-purple-950">Follow-up Due Alerts</p>
+              <p className="text-purple-600/80 mt-0.5">
+                Highlight due and overdue customer follow-up calls in the top action bar
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={notifyFollowups}
+              onChange={(e) => setNotifyFollowups(e.target.checked)}
+              className="w-4 h-4 rounded text-[#6C3BFF] accent-[#6C3BFF] cursor-pointer"
+            />
+          </div>
+
+          <div className="py-3 flex items-center justify-between">
+            <div>
+              <p className="font-bold text-purple-950">Automatic Lead Assignment</p>
+              <p className="text-purple-600/80 mt-0.5">
+                Distribute incoming unassigned leads evenly among active sales team members
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={autoAssignLeads}
+              onChange={(e) => setAutoAssignLeads(e.target.checked)}
+              className="w-4 h-4 rounded text-[#6C3BFF] accent-[#6C3BFF] cursor-pointer"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 4. CLOUD SYNCHRONIZATION & STORAGE (CLEAN & NON-TECHNICAL) */}
+      <div className="bg-white rounded-2xl border border-[#DFD0FF] shadow-xs p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-purple-100 text-[#6C3BFF]">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Supabase Cloud Database</h3>
-              <p className="text-xs text-slate-500">
-                PostgreSQL cloud database for real-estate sites, plots, and leads
+              <h3 className="text-base font-black text-purple-950">Cloud Storage & Data Backup</h3>
+              <p className="text-xs text-purple-600/80">
+                Automatic cloud synchronization for plots, leads, and partner sales records
               </p>
             </div>
           </div>
 
           <span
-            className={`text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 ${
+            className={`text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-center ${
               supabaseConnected
                 ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-purple-100 text-[#6C3BFF]'
+                : 'bg-purple-100 text-purple-800'
             }`}
           >
             <span
@@ -125,188 +404,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 supabaseConnected ? 'bg-emerald-500' : 'bg-[#6C3BFF]'
               }`}
             />
-            <span>{supabaseConnected ? 'Live Supabase Connected' : 'Adaptive Local Store'}</span>
+            <span>{supabaseConnected ? 'Cloud Active (Encrypted)' : 'Adaptive Offline Storage'}</span>
           </span>
         </div>
 
-        {/* Supabase Setup Form */}
-        <form onSubmit={handleSaveSupabase} className="space-y-4 pt-2">
+        <div className="p-4 rounded-xl bg-[#FAF8FF] border border-[#E5DAFF] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Project URL (VITE_SUPABASE_URL)
-            </label>
-            <input
-              type="text"
-              value={supabaseUrl}
-              onChange={(e) => setSupabaseUrl(e.target.value)}
-              placeholder="https://your-project.supabase.co"
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:border-[#6C3BFF]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Anon Public API Key (VITE_SUPABASE_ANON_KEY)
-            </label>
-            <input
-              type="password"
-              value={supabaseKey}
-              onChange={(e) => setSupabaseKey(e.target.value)}
-              placeholder="eyJhbGciOi..."
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:border-[#6C3BFF]"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCopySchema}
-                className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-              >
-                {copiedSchema ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span>Copy SQL Schema (`schema.sql`)</span>
-              </button>
-
-              <a
-                href="https://supabase.com/dashboard"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 underline px-2"
-              >
-                <span>Supabase Dashboard</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
-            <button
-              type="submit"
-              disabled={testingConnection}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#6C3BFF] hover:bg-[#5A2FE0] text-white text-xs font-bold rounded-xl shadow-xs transition-all disabled:opacity-50"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{testingConnection ? 'Verifying...' : 'Save & Connect'}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Role & Access Simulator */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-900">User Role & Access Preview</h3>
-            <p className="text-xs text-slate-500">
-              Preview the CRM interface as Admin, Sales User, or Channel Partner
+            <p className="text-xs font-bold text-purple-950">Instant Cloud Backup & Sync</p>
+            <p className="text-[11px] text-purple-600/80 mt-0.5">
+              Sync any recent offline changes or newly added plots to the cloud database
             </p>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(['ADMIN', 'SALES USER', 'CHANNEL PARTNER'] as UserRole[]).map((r) => {
-            const isCurrent = currentUser.role === r;
-            return (
-              <div
-                key={r}
-                onClick={() => {
-                  dataStore.setCurrentUserRole(r);
-                  showToast(`Role switched to ${r}`, 'info');
-                }}
-                className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  isCurrent
-                    ? 'bg-[#F3EFFF] border-[#6C3BFF] ring-2 ring-[#6C3BFF]/20'
-                    : 'bg-slate-50 border-slate-200 hover:border-purple-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800">{r}</span>
-                  {isCurrent && <CheckCircle2 className="w-4 h-4 text-[#6C3BFF]" />}
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  {r === 'ADMIN'
-                    ? 'Full access to all sites, leads, partners, reports, & settings.'
-                    : r === 'SALES USER'
-                    ? 'Access to view and update leads, follow-ups, and plots.'
-                    : 'Assigned leads view only.'}
-                </p>
-              </div>
-            );
-          })}
+          <button
+            onClick={handleSyncCloud}
+            disabled={isSyncing}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#6C3BFF] hover:bg-[#5820E0] text-white text-xs font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Synchronizing...' : 'Sync Cloud Data'}</span>
+          </button>
         </div>
-      </div>
-
-      {/* Organization Profile (Multi-tenant SaaS Readiness) */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
-            <Building className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Organization Profile</h3>
-            <p className="text-xs text-slate-500">
-              Tenant identification for future multi-tenant SaaS integration (Section 25)
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Company / Developer Name</label>
-            <input
-              type="text"
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">GST / Registration No</label>
-            <input
-              type="text"
-              value={orgGst}
-              onChange={(e) => setOrgGst(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Head Office Phone</label>
-            <input
-              type="text"
-              value={orgPhone}
-              onChange={(e) => setOrgPhone(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Organization Tenant ID</label>
-            <div className="p-2.5 bg-slate-100 font-mono text-slate-500 rounded-xl">
-              org_raghu_realty_main
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Demo Reset & Danger Zone */}
-      <div className="p-5 rounded-2xl border border-rose-200 bg-rose-50/30 flex items-center justify-between gap-4">
-        <div>
-          <h4 className="text-sm font-bold text-rose-900">Reset Demonstration Data</h4>
-          <p className="text-xs text-rose-700 mt-0.5">
-            Clear modifications and reload the clean seed layouts, leads, and channel partners.
-          </p>
-        </div>
-        <button
-          onClick={handleResetData}
-          className="px-4 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-xs rounded-xl shadow-xs shrink-0 transition-colors"
-        >
-          Reset Demo Data
-        </button>
       </div>
     </div>
   );
