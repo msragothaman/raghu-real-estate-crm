@@ -959,6 +959,13 @@ class CRMDataStore {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.removeItem('raghu_crm_auth_session');
+        localStorage.removeItem('raghu_crm_current_user');
+      }
+    } catch (e) {}
+    try {
+      const sb = createSupabaseInstance();
+      if (sb) {
+        sb.auth.signOut().catch(() => {});
       }
     } catch (e) {}
     this.saveState();

@@ -47,12 +47,32 @@ export function getSupabaseCredentials() {
   return { url, key, isConfigured };
 }
 
+let cachedClient: SupabaseClient | null = null;
+let cachedUrl = '';
+let cachedKey = '';
+
 export function createSupabaseInstance(): SupabaseClient | null {
   const { url, key, isConfigured } = getSupabaseCredentials();
-  if (!isConfigured) return null;
+  if (!isConfigured) {
+    cachedClient = null;
+    return null;
+  }
+
+  if (cachedClient && cachedUrl === url && cachedKey === key) {
+    return cachedClient;
+  }
 
   try {
-    return createClient(url, key);
+    cachedClient = createClient(url, key, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    });
+    cachedUrl = url;
+    cachedKey = key;
+    return cachedClient;
   } catch (error) {
     console.error('Failed to initialize Supabase client:', error);
     return null;

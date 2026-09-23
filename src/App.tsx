@@ -14,12 +14,14 @@ import { AddLeadModal } from './components/leads/AddLeadModal';
 import { AddSiteModal } from './components/sites/AddSiteModal';
 import { AddFollowUpModal } from './components/leads/AddFollowUpModal';
 import { DailyFollowupModal } from './components/calendar/DailyFollowupModal';
-import { ToastProvider } from './components/common/Toast';
+import { ToastProvider, useToast } from './components/common/Toast';
 import { SignInPage } from './components/auth/SignInPage';
 import { dataStore } from './lib/dataStore';
-import { Site, Lead, ChannelPartner } from './types/crm';
+import { createSupabaseInstance } from './lib/supabase';
+import { Site, Lead, ChannelPartner, User, UserRole } from './types/crm';
 
 export const AppContent: React.FC = () => {
+  const { showToast } = useToast();
   const [storeState, setStoreState] = useState(dataStore.getState());
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -50,6 +52,69 @@ export const AppContent: React.FC = () => {
       setStoreState({ ...newState });
     });
     return () => unsubscribe();
+  }, []);
+
+  // Handle Supabase Auth redirect (e.g. after clicking email confirmation link)
+  useEffect(() => {
+    const sb = createSupabaseInstance();
+    if (!sb) return;
+
+    // Check for active session or confirmation tokens in URL
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user && session.user.email_confirmed_at) {
+        const userName =
+          session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User';
+        const userRole = (session.user.user_metadata?.role as UserRole) || 'ADMIN';
+        const authedUser: User = {
+          id: session.user.id,
+          name: userName,
+          email: session.user.email || '',
+          role: userRole,
+          created_at: session.user.created_at || new Date().toISOString(),
+        };
+
+        if (!storeState.isAuthenticated) {
+          dataStore.login(authedUser);
+          showToast(`Email confirmed! Welcome to Raghu CRM, ${userName}.`, 'success');
+        }
+
+        if (window.location.hash.includes('access_token')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = sb.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+        if (session.user.email_confirmed_at) {
+          const userName =
+            session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User';
+          const userRole = (session.user.user_metadata?.role as UserRole) || 'ADMIN';
+          const authedUser: User = {
+            id: session.user.id,
+            name: userName,
+            email: session.user.email || '',
+            role: userRole,
+            created_at: session.user.created_at || new Date().toISOString(),
+          };
+
+          dataStore.login(authedUser);
+          showToast(`Email confirmed! Welcome to Raghu CRM, ${userName}.`, 'success');
+
+          if (window.location.hash.includes('access_token')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        dataStore.logout();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Automatically show Daily Follow-up Briefing pop-up once on software open
