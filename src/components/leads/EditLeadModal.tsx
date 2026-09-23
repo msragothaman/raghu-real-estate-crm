@@ -265,13 +265,13 @@ export const EditLeadModal: React.FC<EditLeadModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-purple-950 uppercase mb-1">
-              Purchase Purpose
+              Plot Purchase Purpose
             </label>
             <input
               type="text"
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              placeholder="e.g. Own Villa / Investment"
+              placeholder="e.g. Plot Construction / Investment"
               className="w-full p-2.5 bg-[#FAF8FF] border border-[#E5DAFF] rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
             />
           </div>

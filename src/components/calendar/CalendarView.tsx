@@ -432,6 +432,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             {f.type}
                           </span>
                           <FollowUpStatusBadge status={f.status} size="sm" />
+                          {lead?.budget ? (
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              Budget: {lead.budget}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-500 border border-purple-100 italic">
+                              Budget: Not set
+                            </span>
+                          )}
                           {isOverdue && (
                             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
                               Overdue
@@ -449,6 +458,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             <>
                               <span>•</span>
                               <span>Phone: {lead.phone}</span>
+                              {lead.preferred_plot_size && (
+                                <>
+                                  <span>•</span>
+                                  <span>Plot Size: {lead.preferred_plot_size}</span>
+                                </>
+                              )}
                             </>
                           )}
                           {partner && (

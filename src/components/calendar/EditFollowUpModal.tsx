@@ -3,7 +3,7 @@ import { Modal } from '../common/Modal';
 import { FollowUp, Lead, ChannelPartner, FollowUpType, FollowUpStatus } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
 import { useToast } from '../common/Toast';
-import { Trash2 } from 'lucide-react';
+import { Trash2, IndianRupee } from 'lucide-react';
 
 interface EditFollowUpModalProps {
   followup: FollowUp | null;
@@ -31,6 +31,13 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
   const [followupTime, setFollowupTime] = useState('11:00');
   const [notes, setNotes] = useState('');
 
+  // Customer Budget & Plot Requirements
+  const [budget, setBudget] = useState('');
+  const [preferredPlotSize, setPreferredPlotSize] = useState('');
+  const [purpose, setPurpose] = useState('Plot for Immediate Construction');
+
+  const selectedLead = leads.find((l) => l.id === leadId);
+
   useEffect(() => {
     if (followup) {
       setLeadId(followup.lead_id);
@@ -40,10 +47,25 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
       setFollowupDate(followup.followup_date);
       setFollowupTime(followup.followup_time || '11:00');
       setNotes(followup.notes || '');
+
+      const currentLead = leads.find((l) => l.id === followup.lead_id);
+      if (currentLead) {
+        setBudget(currentLead.budget || '');
+        setPreferredPlotSize(currentLead.preferred_plot_size || '1200 - 1500 sqft');
+        setPurpose(currentLead.purpose || 'Plot for Immediate Construction');
+      }
     }
-  }, [followup]);
+  }, [followup, leads]);
 
   if (!followup) return null;
+
+  const budgetPresets = [
+    '₹10L - ₹15L',
+    '₹15L - ₹25L',
+    '₹25L - ₹35L',
+    '₹35L - ₹50L',
+    '₹50L+',
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +74,7 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
       return;
     }
 
+    // 1. Update Follow-up
     dataStore.updateFollowUp(followup.id, {
       lead_id: leadId,
       assigned_partner_id: assignedPartnerId || null,
@@ -62,7 +85,14 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
       notes: notes.trim() || undefined,
     });
 
-    showToast('Follow-up updated successfully!', 'success');
+    // 2. Sync updated budget & plot requirements to Lead profile
+    dataStore.updateLead(leadId, {
+      budget: budget.trim() || undefined,
+      preferred_plot_size: preferredPlotSize.trim() || undefined,
+      purpose: purpose.trim() || undefined,
+    });
+
+    showToast('Follow-up & customer requirements updated successfully!', 'success');
     onClose();
   };
 
@@ -79,9 +109,9 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Edit Scheduled Follow-up"
-      subtitle="Modify contact agenda, date, time, and assigned partner"
-      maxWidth="md"
+      title="Edit Scheduled Follow-up & Budget"
+      subtitle="Modify contact agenda, date, time, and customer qualification"
+      maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -90,19 +120,27 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
           </label>
           <select
             value={leadId}
-            onChange={(e) => setLeadId(e.target.value)}
+            onChange={(e) => {
+              setLeadId(e.target.value);
+              const targetLead = leads.find((l) => l.id === e.target.value);
+              if (targetLead) {
+                setBudget(targetLead.budget || '');
+                setPreferredPlotSize(targetLead.preferred_plot_size || '1200 - 1500 sqft');
+                setPurpose(targetLead.purpose || 'Plot for Immediate Construction');
+              }
+            }}
             required
             className="w-full p-2.5 bg-[#FAF8FF] border border-[#E5DAFF] rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
           >
             {leads.map((l) => (
               <option key={l.id} value={l.id}>
-                {l.name} - {l.phone} ({l.status})
+                {l.name} - {l.phone} ({l.status}) {l.budget ? `[Budget: ${l.budget}]` : '[Budget: Not set]'}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-purple-950 uppercase mb-1">
               Follow-up Type
@@ -137,7 +175,7 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-purple-950 uppercase mb-1">Date *</label>
             <input
@@ -178,6 +216,77 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
           </select>
         </div>
 
+        {/* Customer Budget & Plot Requirements */}
+        <div className="p-4 bg-[#FAF8FF] border border-[#E5DAFF] rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+              <IndianRupee className="w-4 h-4 text-[#6C3BFF]" />
+              <span>Customer Budget & Plot Requirements (Follow-up Qualification)</span>
+            </h4>
+            <span className="text-[11px] text-purple-600 font-medium">Updates Customer Profile</span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Customer Budget Range
+            </label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {budgetPresets.map((preset) => (
+                <button
+                  type="button"
+                  key={preset}
+                  onClick={() => setBudget(preset)}
+                  className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-all ${
+                    budget === preset
+                      ? 'bg-[#6C3BFF] text-white shadow-xs'
+                      : 'bg-white text-purple-800 border border-[#E5DAFF] hover:border-[#6C3BFF]'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              placeholder="e.g. ₹18 Lakhs or ₹15L - ₹22L"
+              className="w-full p-2.5 bg-white border border-[#E5DAFF] rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Preferred Plot Size
+              </label>
+              <input
+                type="text"
+                value={preferredPlotSize}
+                onChange={(e) => setPreferredPlotSize(e.target.value)}
+                placeholder="e.g. 1200 sqft / 1500 sqft"
+                className="w-full p-2.5 bg-white border border-[#E5DAFF] rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Plot Purchase Purpose
+              </label>
+              <select
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+                className="w-full p-2.5 bg-white border border-[#E5DAFF] rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
+              >
+                <option value="Plot for Immediate Construction">Plot for Immediate Construction</option>
+                <option value="Plot for Investment / Appreciation">Plot for Investment / Appreciation</option>
+                <option value="Plot for Future Family Asset">Plot for Future Family Asset</option>
+                <option value="Plot for Resale">Plot for Resale</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label className="block text-xs font-bold text-purple-950 uppercase mb-1">
             Notes / Agenda
@@ -186,6 +295,7 @@ export const EditFollowUpModal: React.FC<EditFollowUpModalProps> = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
+            placeholder="Follow-up notes and customer discussion points..."
             className="w-full p-2.5 bg-[#FAF8FF] border border-[#E5DAFF] rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
           />
         </div>

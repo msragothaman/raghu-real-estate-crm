@@ -324,10 +324,10 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Property Requirement */}
+          {/* Plot Requirement */}
           <div className="bg-white p-4 rounded-2xl border border-[#E5DAFF] shadow-xs space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400">
-              Property Requirement
+              Plot Requirement
             </h4>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
@@ -343,15 +343,19 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
                 </span>
               </div>
               <div>
-                <span className="text-purple-400 block">Budget</span>
+                <span className="text-purple-400 block">Budget Range</span>
                 <span className="font-bold text-purple-950">
-                  {lead.budget || '₹15L - ₹25L'}
+                  {lead.budget ? (
+                    <span className="text-[#6C3BFF]">{lead.budget}</span>
+                  ) : (
+                    <span className="text-purple-400 font-normal italic">Pending Follow-up</span>
+                  )}
                 </span>
               </div>
               <div>
-                <span className="text-purple-400 block">Purpose</span>
+                <span className="text-purple-400 block">Plot Purpose</span>
                 <span className="font-bold text-purple-950">
-                  {lead.purpose || 'Own Villa Construction'}
+                  {lead.purpose || 'Plot Construction'}
                 </span>
               </div>
             </div>

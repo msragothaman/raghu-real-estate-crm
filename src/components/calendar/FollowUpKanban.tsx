@@ -22,6 +22,7 @@ import {
   RotateCcw,
   ArrowRightLeft,
   User,
+  IndianRupee,
 } from 'lucide-react';
 
 interface FollowUpKanbanProps {
@@ -227,6 +228,17 @@ export const FollowUpKanban: React.FC<FollowUpKanbanProps> = ({
                                       <div className="flex items-center gap-1 text-xs text-purple-600/90 mt-1">
                                         <Phone className="w-3 h-3 text-purple-400" />
                                         <span>{lead.phone}</span>
+                                      </div>
+                                    )}
+
+                                    {lead?.budget ? (
+                                      <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md mt-1.5">
+                                        <IndianRupee className="w-3 h-3 text-emerald-600 shrink-0" />
+                                        <span>Budget: {lead.budget}</span>
+                                      </div>
+                                    ) : (
+                                      <div className="text-[10px] text-purple-400 italic mt-1">
+                                        Budget: Pending call
                                       </div>
                                     )}
 

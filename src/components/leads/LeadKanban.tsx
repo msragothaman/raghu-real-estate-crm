@@ -194,7 +194,11 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
                               <div className="flex items-center justify-between text-[11px] text-purple-700 mt-2 pt-2 border-t border-[#EFE7FF]">
                                 <span>{lead.preferred_plot_size || '1200 sqft'}</span>
                                 <span className="font-bold text-purple-950">
-                                  {lead.budget || '₹15L-20L'}
+                                  {lead.budget ? (
+                                    lead.budget
+                                  ) : (
+                                    <span className="text-purple-400 font-normal italic">Pending</span>
+                                  )}
                                 </span>
                               </div>
 

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
-import { Lead, LeadSource, LeadStatus, Site, ChannelPartner } from '../../types/crm';
+import { Lead, LeadSource, Site, ChannelPartner } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
 import { useToast } from '../common/Toast';
+import { Check, RefreshCw } from 'lucide-react';
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -23,15 +24,36 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [isWhatsappSynced, setIsWhatsappSynced] = useState(true);
   const [email, setEmail] = useState('');
   const [source, setSource] = useState<LeadSource>('Meta');
   const [campaign, setCampaign] = useState('');
   const [interestedSiteId, setInterestedSiteId] = useState(sites[0]?.id || '');
   const [preferredPlotSize, setPreferredPlotSize] = useState('1200 - 1500 sqft');
-  const [budget, setBudget] = useState('₹15L - ₹25L');
-  const [purpose, setPurpose] = useState('Own Villa / Construction');
+  const [purpose, setPurpose] = useState('Plot for Immediate Construction');
   const [preferredLocation, setPreferredLocation] = useState('');
   const [assignedPartnerId, setAssignedPartnerId] = useState(channelPartners[0]?.id || '');
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val);
+    if (isWhatsappSynced) {
+      setWhatsapp(val);
+    }
+  };
+
+  const handleWhatsappChange = (val: string) => {
+    setWhatsapp(val);
+    if (val === phone) {
+      setIsWhatsappSynced(true);
+    } else {
+      setIsWhatsappSynced(false);
+    }
+  };
+
+  const handleResetWhatsappSync = () => {
+    setWhatsapp(phone);
+    setIsWhatsappSynced(true);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +71,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
       campaign: campaign.trim() || `${source} Inbound Enquiry`,
       interested_site_id: interestedSiteId || null,
       preferred_plot_size: preferredPlotSize.trim() || undefined,
-      budget: budget.trim() || undefined,
+      budget: undefined, // Budget will be gathered and recorded during follow-up qualification
       purpose: purpose.trim() || undefined,
       preferred_location: preferredLocation.trim() || undefined,
       status: 'NEW',
@@ -67,7 +89,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Add New Real Estate Lead"
-      subtitle="Enter customer contact details, property requirements, and channel partner assignment"
+      subtitle="Enter customer contact details, plot requirements, and channel partner assignment"
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -89,15 +111,12 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Phone Number *
+              Contact / Phone Number *
             </label>
             <input
               type="tel"
               value={phone}
-              onChange={(e) => {
-                setPhone(e.target.value);
-                if (!whatsapp) setWhatsapp(e.target.value);
-              }}
+              onChange={(e) => handlePhoneChange(e.target.value)}
               placeholder="+91 98400 00000"
               required
               className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
@@ -107,16 +126,39 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              WhatsApp Number
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-700">
+                WhatsApp Number
+              </label>
+              {!isWhatsappSynced && (
+                <button
+                  type="button"
+                  onClick={handleResetWhatsappSync}
+                  className="text-[11px] font-semibold text-[#6C3BFF] hover:underline flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Sync with Phone</span>
+                </button>
+              )}
+            </div>
             <input
               type="tel"
               value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
+              onChange={(e) => handleWhatsappChange(e.target.value)}
               placeholder="+91 98400 00000"
               className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
             />
+            {isWhatsappSynced && phone && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium mt-1">
+                <Check className="w-3 h-3" />
+                Same as contact number (auto-synced)
+              </span>
+            )}
+            {!isWhatsappSynced && (
+              <span className="inline-block text-[11px] text-purple-600 font-medium mt-1">
+                Custom WhatsApp number entered
+              </span>
+            )}
           </div>
 
           <div>
@@ -168,8 +210,8 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
           </div>
         </div>
 
-        {/* Requirement */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Plot Requirements (No House / Villa / Commercial) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Interested Site / Project
@@ -200,37 +242,29 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
               className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
             />
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Budget Range
-            </label>
-            <input
-              type="text"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              placeholder="e.g. ₹15L - ₹20L"
-              className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
-            />
-          </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Purchase Purpose
+              Plot Purchase Purpose
             </label>
             <select
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#6C3BFF]"
             >
-              <option value="Own Villa / House">Own Villa / House</option>
-              <option value="Investment / Appreciation">Investment / Appreciation</option>
-              <option value="Commercial / Resale">Commercial / Resale</option>
-              <option value="Farmhouse / Weekend Villa">Farmhouse / Weekend Villa</option>
+              <option value="Plot for Immediate Construction">Plot for Immediate Construction</option>
+              <option value="Plot for Investment / Appreciation">Plot for Investment / Appreciation</option>
+              <option value="Plot for Future Family Asset">Plot for Future Family Asset</option>
+              <option value="Plot for Resale">Plot for Resale</option>
             </select>
           </div>
+        </div>
+
+        {/* Note on Budget */}
+        <div className="p-3 bg-[#FAF8FF] border border-[#E5DAFF] rounded-xl text-xs text-purple-800 flex items-center justify-between">
+          <span>
+            💡 <strong>Customer Budget:</strong> Budget details are recorded in the <strong>Follow-up section</strong> once you speak to the customer.
+          </span>
         </div>
 
         {/* Partner Assignment */}
