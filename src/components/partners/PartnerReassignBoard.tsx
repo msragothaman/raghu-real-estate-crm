@@ -7,6 +7,7 @@ import {
 } from '@hello-pangea/dnd';
 import { Lead, ChannelPartner, Site } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
+import { soundManager } from '../../lib/soundEffects';
 import { useToast } from '../common/Toast';
 import { LeadStatusBadge } from '../common/Badge';
 import {
@@ -52,6 +53,10 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
     })),
   ];
 
+  const handleDragStart = () => {
+    soundManager.playGrab();
+  };
+
   const handleDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
@@ -70,6 +75,8 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
     // Call dataStore reassignment
     dataStore.reassignLeadPartner(draggableId, newPartnerId);
 
+    soundManager.playDrop();
+
     // Show prompt requirement toast: "Lead reassigned successfully."
     showToast(`Lead reassigned successfully to ${destPartnerName}.`, 'success');
   };
@@ -77,12 +84,12 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
   return (
     <div className="space-y-4">
       {/* Informative Banner */}
-      <div className="p-3.5 bg-[#F3EFFF] border border-[#DDD1FF] rounded-2xl flex items-center justify-between gap-3 text-xs text-purple-900">
+      <div className="p-3.5 bg-gradient-to-r from-[#F3EFFF] via-purple-50/50 to-white border border-[#DDD1FF] rounded-2xl flex items-center justify-between gap-3 text-xs text-purple-900 shadow-xs">
         <div className="flex items-center gap-2">
           <ArrowRightLeft className="w-4 h-4 text-[#6C3BFF] shrink-0" />
           <span className="font-medium">
-            <strong>Drag-and-Drop Reassignment:</strong> Drag any customer lead card to another
-            channel partner column to immediately reassign it, record partner audit logs, and update conversion metrics.
+            <strong>3D Drag-and-Drop Partner Reassignment:</strong> Drag any customer lead card to another
+            channel partner column to immediately reassign it with live haptic audio feedback.
           </span>
         </div>
         <span className="font-bold text-[#6C3BFF] hidden sm:inline">
@@ -90,7 +97,7 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
         </span>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4 pt-1 items-start min-h-[600px] no-scrollbar">
           {partnerColumns.map((col) => {
             const partnerLeads = leads.filter((l) => {
@@ -103,29 +110,22 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
             return (
               <div
                 key={col.id}
-                className={`w-72 shrink-0 bg-white rounded-2xl border ${
-                  col.isDirect
-                    ? 'border-dashed border-slate-300 bg-slate-50/50'
-                    : 'border-slate-200/80 shadow-2xs'
-                } p-3.5 flex flex-col max-h-[calc(100vh-250px)]`}
+                className="w-72 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col max-h-[calc(100vh-210px)]"
               >
                 {/* Column Header */}
-                <div className="pb-3 mb-2 border-b border-slate-100 flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 leading-tight">
-                      {col.name}
-                    </h4>
-                    <span className="text-[11px] text-slate-400 block mt-0.5">
-                      {col.location}
-                    </span>
+                <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 rounded-t-2xl">
+                  <div className="flex items-center gap-2">
+                    {col.isDirect ? (
+                      <UserX className="w-4 h-4 text-purple-600" />
+                    ) : (
+                      <Handshake className="w-4 h-4 text-[#6C3BFF]" />
+                    )}
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-800 leading-tight">{col.name}</h4>
+                      <span className="text-[10px] text-slate-600">{col.location}</span>
+                    </div>
                   </div>
-                  <span
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      col.isDirect
-                        ? 'bg-slate-200 text-slate-700'
-                        : 'bg-purple-100 text-[#6C3BFF]'
-                    }`}
-                  >
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
                     {partnerLeads.length}
                   </span>
                 </div>
@@ -136,8 +136,10 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex-1 overflow-y-auto space-y-2.5 p-1 min-h-[220px] rounded-xl transition-colors ${
-                        snapshot.isDraggingOver ? 'bg-[#F3EFFF]/50 ring-2 ring-[#6C3BFF]/20' : ''
+                      className={`flex-1 overflow-y-auto space-y-2.5 p-1 min-h-[220px] rounded-xl transition-all duration-200 ${
+                        snapshot.isDraggingOver
+                          ? 'bg-gradient-to-b from-[#F7F3FF] to-purple-50/70 ring-2 ring-[#6C3BFF]/30 border-2 border-dashed border-[#6C3BFF]/50'
+                          : ''
                       }`}
                     >
                       {partnerLeads.length === 0 ? (
@@ -156,9 +158,9 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
                                   {...dragProvided.draggableProps}
                                   {...dragProvided.dragHandleProps}
                                   onClick={() => onSelectLead(lead)}
-                                  className={`bg-white p-3 rounded-xl border border-slate-200 shadow-2xs hover:shadow-md hover:border-[#6C3BFF]/40 cursor-grab active:cursor-grabbing transition-all ${
+                                  className={`bg-white p-3 rounded-xl border border-slate-200 shadow-2xs hover:shadow-lg hover:-translate-y-0.5 hover:border-[#6C3BFF]/40 cursor-grab active:cursor-grabbing transition-all duration-200 ${
                                     dragSnapshot.isDragging
-                                      ? 'shadow-xl scale-102 border-[#6C3BFF] ring-2 ring-[#6C3BFF]/30'
+                                      ? 'shadow-[0_20px_45px_rgba(108,59,255,0.35)] rotate-2 scale-105 border-[#6C3BFF] ring-2 ring-[#6C3BFF]/40 z-50'
                                       : ''
                                   }`}
                                 >

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Menu,
   Search,
@@ -6,11 +6,14 @@ import {
   Building,
   Plus,
   ShieldAlert,
-  Database,
   LogOut,
+  Volume2,
+  VolumeX,
+  Sparkles,
 } from 'lucide-react';
 import { User, UserRole } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
+import { soundManager } from '../../lib/soundEffects';
 
 interface TopbarProps {
   currentUser: User;
@@ -20,6 +23,7 @@ interface TopbarProps {
   onOpenAddLead: () => void;
   onOpenAddFollowup: () => void;
   onOpenAddSite: () => void;
+  onOpenDailyBriefing?: () => void;
   followupsDueCount: number;
   onSignOut?: () => void;
 }
@@ -32,15 +36,27 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenAddLead,
   onOpenAddFollowup,
   onOpenAddSite,
+  onOpenDailyBriefing,
   followupsDueCount,
   onSignOut,
 }) => {
+  const [isMuted, setIsMuted] = useState(soundManager.getIsMuted());
+
+  useEffect(() => {
+    const unsub = soundManager.subscribe((muted) => setIsMuted(muted));
+    return () => unsub();
+  }, []);
+
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     dataStore.setCurrentUserRole(e.target.value as UserRole);
   };
 
+  const handleToggleSound = () => {
+    soundManager.toggleMute();
+  };
+
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-sm border-b border-[#EADFFF] px-4 md:px-6 flex items-center justify-between gap-4 shrink-0 z-10 shadow-xs">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-[#EADFFF] px-4 md:px-6 flex items-center justify-between gap-4 shrink-0 z-10 shadow-xs">
       {/* Left: Mobile Toggle & Global Search */}
       <div className="flex items-center gap-3 flex-1 max-w-md">
         <button
@@ -65,10 +81,46 @@ export const Topbar: React.FC<TopbarProps> = ({
 
       {/* Right: Actions, Role Switcher, Profile */}
       <div className="flex items-center gap-2 md:gap-3">
+        {/* Sound Effects Toggle */}
+        <button
+          onClick={handleToggleSound}
+          title={isMuted ? 'Sound Effects: Muted (Click to Unmute)' : 'Sound Effects: Active (Click to Mute)'}
+          className={`p-2 rounded-xl border transition-all ${
+            isMuted
+              ? 'bg-slate-50 border-slate-200 text-slate-400 hover:text-purple-600'
+              : 'bg-[#F5F0FF] border-[#E5DAFF] text-[#6C3BFF] hover:bg-purple-100 shadow-xs'
+          }`}
+        >
+          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </button>
+
+        {/* Daily Followup Briefing Button */}
+        {onOpenDailyBriefing && (
+          <button
+            onClick={() => {
+              soundManager.playClick();
+              onOpenDailyBriefing();
+            }}
+            title="Open Today's Follow-up Briefing"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#F5F0FF] to-purple-100/70 hover:from-purple-100 hover:to-purple-200 text-[#6C3BFF] font-bold text-xs rounded-xl border border-[#DFD0FF] shadow-xs transition-all hover:scale-102"
+          >
+            <Bell className="w-3.5 h-3.5 text-[#6C3BFF]" />
+            <span className="hidden sm:inline">Daily Briefing</span>
+            {followupsDueCount > 0 && (
+              <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                {followupsDueCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Quick Action buttons (Desktop) */}
         <div className="hidden lg:flex items-center gap-2">
           <button
-            onClick={onOpenAddFollowup}
+            onClick={() => {
+              soundManager.playClick();
+              onOpenAddFollowup();
+            }}
             className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border border-[#E5DAFF] hover:bg-[#F5F0FF] text-purple-900 transition-colors"
           >
             <Plus className="w-3.5 h-3.5 text-[#6C3BFF]" />
@@ -76,21 +128,16 @@ export const Topbar: React.FC<TopbarProps> = ({
           </button>
 
           <button
-            onClick={onOpenAddSite}
+            onClick={() => {
+              soundManager.playClick();
+              onOpenAddSite();
+            }}
             className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border border-[#E5DAFF] hover:bg-[#F5F0FF] text-purple-900 transition-colors"
           >
             <Building className="w-3.5 h-3.5 text-[#6C3BFF]" />
             <span>New Site</span>
           </button>
         </div>
-
-        {/* Due Followups Alert Badge */}
-        {followupsDueCount > 0 && (
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">
-            <Bell className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-            <span>{followupsDueCount} due</span>
-          </div>
-        )}
 
         {/* Role Switcher Pill */}
         <div className="flex items-center gap-1.5 bg-[#FAF8FF] border border-[#E5DAFF] rounded-xl px-2.5 py-1 text-xs">

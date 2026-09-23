@@ -13,6 +13,7 @@ import { SettingsView } from './components/settings/SettingsView';
 import { AddLeadModal } from './components/leads/AddLeadModal';
 import { AddSiteModal } from './components/sites/AddSiteModal';
 import { AddFollowUpModal } from './components/leads/AddFollowUpModal';
+import { DailyFollowupModal } from './components/calendar/DailyFollowupModal';
 import { ToastProvider } from './components/common/Toast';
 import { SignInPage } from './components/auth/SignInPage';
 import { dataStore } from './lib/dataStore';
@@ -41,6 +42,7 @@ export const AppContent: React.FC = () => {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [isAddSiteOpen, setIsAddSiteOpen] = useState(false);
   const [isAddFollowupOpen, setIsAddFollowupOpen] = useState(false);
+  const [isDailyBriefingOpen, setIsDailyBriefingOpen] = useState(false);
 
   // Subscribe to reactive data store
   useEffect(() => {
@@ -49,6 +51,24 @@ export const AppContent: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Automatically show Daily Follow-up Briefing pop-up once on software open
+  useEffect(() => {
+    if (storeState.isAuthenticated && storeState.followups.length > 0) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const hasUrgentFollowups = storeState.followups.some(
+        (f) => f.status === 'Pending' && f.followup_date <= todayStr
+      );
+      const sessionBriefingShown = sessionStorage.getItem('raghu_crm_daily_briefing_shown');
+      if (hasUrgentFollowups && !sessionBriefingShown) {
+        const timer = setTimeout(() => {
+          setIsDailyBriefingOpen(true);
+          sessionStorage.setItem('raghu_crm_daily_briefing_shown', 'true');
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [storeState.isAuthenticated, storeState.followups]);
 
   const stats = dataStore.getDashboardStats();
 
@@ -145,6 +165,7 @@ export const AppContent: React.FC = () => {
           onOpenAddLead={() => setIsAddLeadOpen(true)}
           onOpenAddFollowup={() => setIsAddFollowupOpen(true)}
           onOpenAddSite={() => setIsAddSiteOpen(true)}
+          onOpenDailyBriefing={() => setIsDailyBriefingOpen(true)}
           followupsDueCount={stats.followupsDue}
           onSignOut={handleSignOut}
         />
@@ -269,6 +290,18 @@ export const AppContent: React.FC = () => {
           onClose={() => setIsAddFollowupOpen(false)}
           leads={storeState.leads}
           channelPartners={storeState.channelPartners}
+        />
+      )}
+
+      {isDailyBriefingOpen && (
+        <DailyFollowupModal
+          isOpen={isDailyBriefingOpen}
+          onClose={() => setIsDailyBriefingOpen(false)}
+          followups={storeState.followups}
+          leads={storeState.leads}
+          channelPartners={storeState.channelPartners}
+          onSelectLead={handleSelectLead}
+          onOpenCalendar={() => setCurrentTab('calendar')}
         />
       )}
     </div>

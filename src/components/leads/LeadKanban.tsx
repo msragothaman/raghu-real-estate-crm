@@ -7,6 +7,7 @@ import {
 } from '@hello-pangea/dnd';
 import { Lead, LeadStatus, Site, ChannelPartner } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
+import { soundManager } from '../../lib/soundEffects';
 import { useToast } from '../common/Toast';
 import {
   Phone,
@@ -89,6 +90,10 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
     },
   ];
 
+  const handleDragStart = () => {
+    soundManager.playGrab();
+  };
+
   const handleDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
 
@@ -99,6 +104,13 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
     const lead = leads.find((l) => l.id === draggableId);
 
     dataStore.updateLeadStatus(draggableId, newStatus);
+
+    if (newStatus === 'BOOKED' || newStatus === 'REGISTRATION COMPLETED') {
+      soundManager.playSuccess();
+    } else {
+      soundManager.playDrop();
+    }
+
     showToast(
       `${lead ? lead.name : 'Lead'} moved to ${newStatus}`,
       'success'
@@ -106,7 +118,7 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
   };
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex gap-4 overflow-x-auto pb-4 pt-1 items-start min-h-[650px] no-scrollbar">
         {columns.map((col) => {
           const columnLeads = leads.filter((l) => l.status === col.id);
@@ -134,8 +146,10 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`flex-1 overflow-y-auto space-y-2.5 p-1 min-h-[200px] rounded-xl transition-colors ${
-                      snapshot.isDraggingOver ? 'bg-purple-100/60 ring-2 ring-[#6C3BFF]/20' : ''
+                    className={`flex-1 overflow-y-auto space-y-2.5 p-1 min-h-[200px] rounded-xl transition-all duration-200 ${
+                      snapshot.isDraggingOver
+                        ? 'bg-gradient-to-b from-[#F7F3FF] to-purple-50/70 ring-2 ring-[#6C3BFF]/30 border-2 border-dashed border-[#6C3BFF]/50'
+                        : ''
                     }`}
                   >
                     {columnLeads.map((lead, index) => {
@@ -152,9 +166,9 @@ export const LeadKanban: React.FC<LeadKanbanProps> = ({
                               {...dragProvided.draggableProps}
                               {...dragProvided.dragHandleProps}
                               onClick={() => onSelectLead(lead)}
-                              className={`bg-white p-3.5 rounded-xl border border-[#E5DAFF] shadow-2xs hover:shadow-md hover:border-[#6C3BFF] cursor-grab active:cursor-grabbing transition-all ${
+                              className={`bg-white p-3.5 rounded-xl border border-[#E5DAFF] shadow-2xs hover:shadow-lg hover:-translate-y-0.5 hover:border-[#6C3BFF]/50 cursor-grab active:cursor-grabbing transition-all duration-200 ${
                                 dragSnapshot.isDragging
-                                  ? 'shadow-xl rotate-1 scale-102 border-[#6C3BFF] ring-2 ring-[#6C3BFF]/30'
+                                  ? 'shadow-[0_20px_45px_rgba(108,59,255,0.35)] rotate-2 scale-105 border-[#6C3BFF] ring-2 ring-[#6C3BFF]/40 z-50'
                                   : ''
                               }`}
                             >

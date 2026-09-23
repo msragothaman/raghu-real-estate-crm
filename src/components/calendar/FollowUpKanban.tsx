@@ -7,6 +7,7 @@ import {
 } from '@hello-pangea/dnd';
 import { FollowUp, Lead, ChannelPartner, Site, FollowUpStatus } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
+import { soundManager } from '../../lib/soundEffects';
 import { useToast } from '../common/Toast';
 import {
   Phone,
@@ -88,6 +89,10 @@ export const FollowUpKanban: React.FC<FollowUpKanbanProps> = ({
     },
   ];
 
+  const handleDragStart = () => {
+    soundManager.playGrab();
+  };
+
   const handleDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
     if (!destination) return;
@@ -95,6 +100,13 @@ export const FollowUpKanban: React.FC<FollowUpKanbanProps> = ({
 
     const newStatus = destination.droppableId as FollowUpStatus;
     dataStore.updateFollowUpStatus(draggableId, newStatus);
+
+    if (newStatus === 'Completed') {
+      soundManager.playSuccess();
+    } else {
+      soundManager.playDrop();
+    }
+
     showToast(`Follow-up moved to "${newStatus}" status.`, 'success');
   };
 
@@ -122,11 +134,11 @@ export const FollowUpKanban: React.FC<FollowUpKanbanProps> = ({
   return (
     <div className="space-y-4">
       {/* Banner */}
-      <div className="p-3.5 bg-[#F5F0FF] border border-[#DFD0FF] rounded-2xl flex items-center justify-between gap-3 text-xs text-purple-950">
+      <div className="p-3.5 bg-gradient-to-r from-[#F5F0FF] via-purple-50/50 to-white border border-[#DFD0FF] rounded-2xl flex items-center justify-between gap-3 text-xs text-purple-950 shadow-xs">
         <div className="flex items-center gap-2">
           <ArrowRightLeft className="w-4 h-4 text-[#6C3BFF] shrink-0" />
           <span>
-            <strong>Drag-and-Drop Follow-Up Status:</strong> Drag any follow-up card between columns to change its status instantly (e.g. from <em>Pending</em> to <em>Completed</em> or <em>Cancelled</em>).
+            <strong>3D Drag-and-Drop Status Board:</strong> Drag any follow-up card between columns to change its status instantly with live haptic audio feedback.
           </span>
         </div>
         <span className="font-bold text-[#6C3BFF] shrink-0">
@@ -134,7 +146,7 @@ export const FollowUpKanban: React.FC<FollowUpKanbanProps> = ({
         </span>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start min-h-[600px]">
           {columns.map((col) => {
             const colItems = followups.filter((f) => f.status === col.id);
@@ -166,9 +178,9 @@ export const FollowUpKanban: React.FC<FollowUpKanbanProps> = ({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`p-3 space-y-3 min-h-[450px] max-h-[calc(100vh-280px)] overflow-y-auto transition-colors ${
+                      className={`p-3 space-y-3 min-h-[450px] max-h-[calc(100vh-280px)] overflow-y-auto transition-all duration-200 ${
                         snapshot.isDraggingOver
-                          ? 'bg-[#FAF8FF] ring-2 ring-[#6C3BFF]/20 rounded-b-2xl'
+                          ? 'bg-gradient-to-b from-[#F7F3FF] to-purple-50/70 ring-2 ring-[#6C3BFF]/40 border-2 border-dashed border-[#6C3BFF]/60 rounded-b-2xl'
                           : ''
                       }`}
                     >
@@ -194,9 +206,9 @@ export const FollowUpKanban: React.FC<FollowUpKanbanProps> = ({
                                   ref={dragProvided.innerRef}
                                   {...dragProvided.draggableProps}
                                   {...dragProvided.dragHandleProps}
-                                  className={`bg-white rounded-xl p-3.5 border border-[#E5DAFF] shadow-2xs hover:shadow-md hover:border-[#6C3BFF]/50 transition-all cursor-grab active:cursor-grabbing ${
+                                  className={`bg-white rounded-xl p-3.5 border border-[#E5DAFF] shadow-2xs hover:shadow-lg hover:-translate-y-0.5 hover:border-[#6C3BFF]/50 transition-all duration-200 cursor-grab active:cursor-grabbing ${
                                     dragSnapshot.isDragging
-                                      ? 'shadow-xl scale-102 border-[#6C3BFF] ring-2 ring-[#6C3BFF]/30'
+                                      ? 'shadow-[0_20px_45px_rgba(108,59,255,0.35)] rotate-2 scale-105 border-[#6C3BFF] ring-2 ring-[#6C3BFF]/40 z-50'
                                       : ''
                                   }`}
                                 >
