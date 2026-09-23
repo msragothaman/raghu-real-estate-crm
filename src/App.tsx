@@ -253,6 +253,7 @@ export const AppContent: React.FC = () => {
               sites={storeState.sites}
               channelPartners={storeState.channelPartners}
               plots={storeState.plots}
+              followups={storeState.followups}
             />
           )}
 
