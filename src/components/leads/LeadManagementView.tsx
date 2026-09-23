@@ -7,7 +7,13 @@ import {
   Filter,
   Users,
   Sparkles,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  ChevronDown,
 } from 'lucide-react';
+import { useToast } from '../common/Toast';
+import { soundManager } from '../../lib/soundEffects';
 import {
   Lead,
   Site,
@@ -57,12 +63,14 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
   selectedLead,
   setSelectedLead,
 }) => {
+  const { showToast } = useToast();
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [siteFilter, setSiteFilter] = useState<string>('ALL');
   const [partnerFilter, setPartnerFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || 'ALL');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   // Follow-up scheduling modal state
   const [scheduleLeadId, setScheduleLeadId] = useState<string | null>(null);
@@ -84,6 +92,229 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
 
     return true;
   });
+
+  // Helper to map and sanitize lead details for export
+  const generateLeadDataRows = (leadList: Lead[]) => {
+    return leadList.map((lead) => {
+      const site = sites.find((s) => s.id === lead.interested_site_id);
+      const partner = channelPartners.find((cp) => cp.id === lead.assigned_channel_partner_id);
+      const user = users.find((u) => u.id === lead.assigned_user_id);
+
+      return {
+        id: lead.id,
+        name: lead.name || 'Unnamed',
+        phone: lead.phone || '',
+        whatsapp: lead.whatsapp || lead.phone || '',
+        email: lead.email || '',
+        status: lead.status || 'NEW',
+        source: lead.source || 'Direct',
+        campaign: lead.campaign || 'Direct / Organic',
+        siteName: site ? site.name : 'All / General',
+        siteLocation: site ? site.location : '',
+        plotSize: lead.preferred_plot_size || 'Not Specified',
+        budget: lead.budget || 'Not Specified',
+        purpose: lead.purpose || 'Investment',
+        preferredLocation: lead.preferred_location || 'Not Specified',
+        partnerName: partner ? partner.name : 'In-House Direct',
+        partnerPhone: partner ? partner.phone : '',
+        salesExecutive: user ? user.name : 'Unassigned',
+        createdDate: lead.created_at ? new Date(lead.created_at).toLocaleDateString('en-IN') : '',
+        updatedDate: lead.updated_at ? new Date(lead.updated_at).toLocaleDateString('en-IN') : '',
+      };
+    });
+  };
+
+  // Export to standard CSV with UTF-8 BOM
+  const handleExportCSV = (exportAll: boolean) => {
+    const leadsToExport = exportAll ? leads : filteredLeads;
+    const label = exportAll ? 'All' : 'Filtered';
+
+    if (leadsToExport.length === 0) {
+      showToast('No leads available to export.', 'error');
+      return;
+    }
+
+    const rows = generateLeadDataRows(leadsToExport);
+    const headers = [
+      'Lead ID',
+      'Customer Name',
+      'Phone Number',
+      'WhatsApp Number',
+      'Email Address',
+      'Pipeline Status',
+      'Lead Source',
+      'Campaign',
+      'Interested Site',
+      'Site Location',
+      'Preferred Plot Size',
+      'Budget Range',
+      'Investment Purpose',
+      'Preferred Location',
+      'Assigned Partner',
+      'Partner Contact',
+      'Sales Executive',
+      'Created Date',
+      'Last Updated',
+    ];
+
+    const escapeCsv = (val: string | number) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
+    const csvDataLines = rows.map((r) =>
+      [
+        escapeCsv(r.id),
+        escapeCsv(r.name),
+        escapeCsv(r.phone),
+        escapeCsv(r.whatsapp),
+        escapeCsv(r.email),
+        escapeCsv(r.status),
+        escapeCsv(r.source),
+        escapeCsv(r.campaign),
+        escapeCsv(r.siteName),
+        escapeCsv(r.siteLocation),
+        escapeCsv(r.plotSize),
+        escapeCsv(r.budget),
+        escapeCsv(r.purpose),
+        escapeCsv(r.preferredLocation),
+        escapeCsv(r.partnerName),
+        escapeCsv(r.partnerPhone),
+        escapeCsv(r.salesExecutive),
+        escapeCsv(r.createdDate),
+        escapeCsv(r.updatedDate),
+      ].join(',')
+    );
+
+    const csvContent = '\uFEFF' + [headers.map(escapeCsv).join(','), ...csvDataLines].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const filename = `Raghu_CRM_${label}_Leads_${new Date().toISOString().split('T')[0]}.csv`;
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    soundManager.playSuccess();
+    showToast(`Downloaded ${leadsToExport.length} leads as CSV (${filename})!`, 'success');
+    setIsExportMenuOpen(false);
+  };
+
+  // Export to styled Excel (.xls)
+  const handleExportXLS = (exportAll: boolean) => {
+    const leadsToExport = exportAll ? leads : filteredLeads;
+    const label = exportAll ? 'All' : 'Filtered';
+
+    if (leadsToExport.length === 0) {
+      showToast('No leads available to export.', 'error');
+      return;
+    }
+
+    const rows = generateLeadDataRows(leadsToExport);
+    const headers = [
+      'Lead ID',
+      'Customer Name',
+      'Phone Number',
+      'WhatsApp Number',
+      'Email Address',
+      'Pipeline Status',
+      'Lead Source',
+      'Campaign',
+      'Interested Site',
+      'Site Location',
+      'Preferred Plot Size',
+      'Budget Range',
+      'Investment Purpose',
+      'Preferred Location',
+      'Assigned Partner',
+      'Partner Contact',
+      'Sales Executive',
+      'Created Date',
+      'Last Updated',
+    ];
+
+    const filename = `Raghu_CRM_${label}_Leads_${new Date().toISOString().split('T')[0]}.xls`;
+
+    const rowsHtml = rows
+      .map((r, idx) => {
+        const bg = idx % 2 === 0 ? '#FFFFFF' : '#F9F8FE';
+        return `
+          <tr style="background-color: ${bg};">
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; color: #64748B;">${r.id}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #1E293B;">${r.name}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; mso-number-format:'\\@';">${r.phone}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; mso-number-format:'\\@';">${r.whatsapp}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.email}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #6C3BFF;">${r.status}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.source}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.campaign}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; font-weight: 500;">${r.siteName}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; color: #64748B;">${r.siteLocation}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.plotSize}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #047857;">${r.budget}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.purpose}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.preferredLocation}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.partnerName}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px; mso-number-format:'\\@';">${r.partnerPhone}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.salesExecutive}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.createdDate}</td>
+            <td style="border: 1px solid #E2E8F0; padding: 8px 12px; font-family: Arial, sans-serif; font-size: 12px;">${r.updatedDate}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const excelHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+          <!--[if gte mso 9]>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                  <x:Name>Raghu CRM Leads</x:Name>
+                  <x:WorksheetOptions>
+                    <x:DisplayGridlines/>
+                  </x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+          <![endif]-->
+        </head>
+        <body>
+          <h2 style="font-family: Arial, sans-serif; color: #6C3BFF; margin-bottom: 4px;">Raghu Real Estate CRM - ${label} Leads Export</h2>
+          <p style="font-family: Arial, sans-serif; font-size: 12px; color: #64748B; margin-top: 0; margin-bottom: 12px;">Generated on ${new Date().toLocaleString('en-IN')} | Total Records: ${leadsToExport.length}</p>
+          <table border="1" style="border-collapse: collapse; border: 1px solid #CBD5E1;">
+            <thead>
+              <tr style="background-color: #6C3BFF; color: #FFFFFF; font-family: Arial, sans-serif; font-weight: bold; font-size: 12px; text-align: left;">
+                ${headers.map((h) => `<th style="padding: 10px 12px; border: 1px solid #5A2FE0; white-space: nowrap;">${h}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    soundManager.playSuccess();
+    showToast(`Downloaded ${leadsToExport.length} leads as Excel (.xls) (${filename})!`, 'success');
+    setIsExportMenuOpen(false);
+  };
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
@@ -126,6 +357,139 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
               <TableIcon className="w-3.5 h-3.5" />
               <span>Table</span>
             </button>
+          </div>
+
+          {/* Export Leads Dropdown Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setIsExportMenuOpen((prev) => !prev)}
+              className="inline-flex items-center gap-2 bg-white hover:bg-purple-50 text-[#6C3BFF] border border-[#DDD1FF] hover:border-[#6C3BFF] text-xs sm:text-sm font-bold px-3 py-2.5 rounded-xl shadow-xs transition-all"
+              title="Download leads as CSV or Excel (.xls)"
+            >
+              <Download className="w-4 h-4 text-[#6C3BFF]" />
+              <span className="hidden xs:inline">Export Leads</span>
+              <span className="xs:hidden">Export</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-purple-400 transition-transform duration-200 ${
+                  isExportMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {isExportMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsExportMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-purple-100 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-2 border-b border-purple-50 mb-2">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-purple-600">
+                      Export Leads Pipeline
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Download full data in CSV or styled Excel (.xls)
+                    </p>
+                  </div>
+
+                  {/* Section 1: ALL LEADS */}
+                  <div className="space-y-1">
+                    <div className="px-3 py-1 flex items-center justify-between text-[11px] font-bold text-slate-400">
+                      <span>ALL CRM LEADS</span>
+                      <span className="bg-purple-100 text-[#6C3BFF] px-2 py-0.5 rounded-full text-[10px]">
+                        {leads.length} leads
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => handleExportCSV(true)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-purple-50 text-slate-700 hover:text-[#6C3BFF] transition-colors group text-left"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 group-hover:text-[#6C3BFF]">
+                            Download All Leads (CSV)
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Standard CSV format
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        .csv
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => handleExportXLS(true)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-purple-50 text-slate-700 hover:text-[#6C3BFF] transition-colors group text-left"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-[#F3EFFF] text-[#6C3BFF] flex items-center justify-center group-hover:scale-105 transition-transform">
+                          <FileSpreadsheet className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 group-hover:text-[#6C3BFF]">
+                            Download All Leads (Excel)
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Styled spreadsheet (.xls)
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-[#6C3BFF] border border-purple-200">
+                        .xls
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Section 2: FILTERED LEADS (Only if filters active) */}
+                  {filteredLeads.length !== leads.length && (
+                    <div className="mt-3 pt-2 border-t border-purple-50 space-y-1">
+                      <div className="px-3 py-1 flex items-center justify-between text-[11px] font-bold text-slate-400">
+                        <span>CURRENT FILTERED VIEW</span>
+                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px]">
+                          {filteredLeads.length} leads
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleExportCSV(false)}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-amber-50/60 text-slate-700 hover:text-amber-800 transition-colors group text-left"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <FileText className="w-4 h-4 text-amber-600" />
+                          <span className="text-xs font-semibold text-slate-800">
+                            Filtered Leads (CSV)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          {filteredLeads.length} .csv
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => handleExportXLS(false)}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-amber-50/60 text-slate-700 hover:text-amber-800 transition-colors group text-left"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                          <span className="text-xs font-semibold text-slate-800">
+                            Filtered Leads (Excel .xls)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          {filteredLeads.length} .xls
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <button
@@ -233,6 +597,27 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
             Reset Filters
           </button>
         )}
+
+        {/* Quick Export actions on filter bar */}
+        <div className="sm:ml-auto flex items-center gap-1.5 pt-1 sm:pt-0">
+          <span className="text-[11px] font-bold text-slate-400 mr-1 hidden md:inline">Quick Download:</span>
+          <button
+            onClick={() => handleExportCSV(filteredLeads.length === leads.length)}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-xl transition-all shadow-2xs"
+            title={filteredLeads.length === leads.length ? "Download all leads as CSV" : `Download ${filteredLeads.length} filtered leads as CSV`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>CSV</span>
+          </button>
+          <button
+            onClick={() => handleExportXLS(filteredLeads.length === leads.length)}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#6C3BFF] hover:text-[#5A2FE0] bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2.5 py-1.5 rounded-xl transition-all shadow-2xs"
+            title={filteredLeads.length === leads.length ? "Download all leads as Excel (.xls)" : `Download ${filteredLeads.length} filtered leads as Excel (.xls)`}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Excel (.xls)</span>
+          </button>
+        </div>
       </div>
 
       {/* Main View Area */}
