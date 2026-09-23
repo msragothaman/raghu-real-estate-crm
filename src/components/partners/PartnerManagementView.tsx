@@ -12,7 +12,7 @@ import {
   Search,
   Edit,
 } from 'lucide-react';
-import { ChannelPartner, Lead, Site, Plot, FollowUp } from '../../types/crm';
+import { ChannelPartner, Lead, Site, Plot, FollowUp, User } from '../../types/crm';
 import { dataStore } from '../../lib/dataStore';
 import { PartnerDetails } from './PartnerDetails';
 import { PartnerReassignBoard } from './PartnerReassignBoard';
@@ -28,6 +28,7 @@ interface PartnerManagementViewProps {
   onSelectLead: (lead: Lead) => void;
   selectedPartnerId?: string | null;
   onClearSelectedPartner?: () => void;
+  currentUser?: User;
 }
 
 export const PartnerManagementView: React.FC<PartnerManagementViewProps> = ({
@@ -39,7 +40,10 @@ export const PartnerManagementView: React.FC<PartnerManagementViewProps> = ({
   onSelectLead,
   selectedPartnerId,
   onClearSelectedPartner,
+  currentUser,
 }) => {
+  const activeUser = currentUser || dataStore.getState().currentUser;
+  const isAdmin = activeUser.role === 'ADMIN';
   const [activeSubTab, setActiveSubTab] = useState<'directory' | 'reassign'>('directory');
   const [activePartner, setActivePartner] = useState<ChannelPartner | null>(
     selectedPartnerId
@@ -121,18 +125,21 @@ export const PartnerManagementView: React.FC<PartnerManagementViewProps> = ({
             </button>
           </div>
 
-          <button
-            onClick={() => setIsAddPartnerOpen(true)}
-            className="inline-flex items-center gap-2 bg-[#6C3BFF] hover:bg-[#5820E0] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-[#6C3BFF]/30 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Onboard Partner</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddPartnerOpen(true)}
+              className="inline-flex items-center gap-2 bg-[#6C3BFF] hover:bg-[#5820E0] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-[#6C3BFF]/30 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Onboard Partner</span>
+            </button>
+          )}
         </div>
       </div>
 
       {activeSubTab === 'reassign' ? (
         <PartnerReassignBoard
+          currentUser={activeUser}
           leads={leads}
           channelPartners={channelPartners}
           sites={sites}
@@ -182,13 +189,15 @@ export const PartnerManagementView: React.FC<PartnerManagementViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setEditingPartner(partner)}
-                          className="p-1.5 text-purple-400 hover:text-[#6C3BFF] hover:bg-purple-50 rounded-lg"
-                          title="Edit Partner"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => setEditingPartner(partner)}
+                            className="p-1.5 text-purple-400 hover:text-[#6C3BFF] hover:bg-purple-50 rounded-lg"
+                            title="Edit Partner"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             partner.status === 'ACTIVE'

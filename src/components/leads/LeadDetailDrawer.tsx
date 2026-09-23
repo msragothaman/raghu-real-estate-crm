@@ -18,6 +18,8 @@ import {
   Plus,
   Edit,
   Trash2,
+  Shield,
+  Lock,
 } from 'lucide-react';
 import {
   Lead,
@@ -46,6 +48,7 @@ interface LeadDetailDrawerProps {
   partnerHistory: PartnerAssignmentHistory[];
   notes: LeadNote[];
   onOpenScheduleFollowup: (leadId: string) => void;
+  currentUser?: User;
 }
 
 export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
@@ -59,8 +62,11 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
   partnerHistory,
   notes,
   onOpenScheduleFollowup,
+  currentUser,
 }) => {
   const { showToast } = useToast();
+  const activeUser = currentUser || dataStore.getState().currentUser;
+  const isAdmin = activeUser.role === 'ADMIN';
   const [newNoteText, setNewNoteText] = useState('');
   const [isEditingPartner, setIsEditingPartner] = useState(false);
   const [selectedPartnerId, setSelectedPartnerId] = useState('');
@@ -205,21 +211,32 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsEditLeadOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-100 text-[#6C3BFF] border border-[#E5DAFF] rounded-xl text-xs font-bold shadow-xs transition-colors"
-            >
-              <Edit className="w-3.5 h-3.5" />
-              <span>Edit Lead</span>
-            </button>
+            {!isAdmin && (
+              <span className="text-[11px] font-bold text-[#6C3BFF] bg-purple-50 px-2.5 py-1 rounded-xl border border-purple-200 flex items-center gap-1">
+                <Shield className="w-3 h-3" />
+                Partner View
+              </span>
+            )}
 
-            <button
-              onClick={handleDeleteLead}
-              className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors"
-              title="Delete Lead"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setIsEditLeadOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-100 text-[#6C3BFF] border border-[#E5DAFF] rounded-xl text-xs font-bold shadow-xs transition-colors"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Edit Lead</span>
+                </button>
+
+                <button
+                  onClick={handleDeleteLead}
+                  className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors"
+                  title="Delete Lead"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            )}
 
             <button
               onClick={onClose}
@@ -367,16 +384,23 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
               <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400">
                 Assignment Details
               </h4>
-              {!isEditingPartner && (
-                <button
-                  onClick={() => {
-                    setSelectedPartnerId(lead.assigned_channel_partner_id || '');
-                    setIsEditingPartner(true);
-                  }}
-                  className="text-xs font-bold text-[#6C3BFF] hover:underline"
-                >
-                  Reassign Partner
-                </button>
+              {isAdmin ? (
+                !isEditingPartner && (
+                  <button
+                    onClick={() => {
+                      setSelectedPartnerId(lead.assigned_channel_partner_id || '');
+                      setIsEditingPartner(true);
+                    }}
+                    className="text-xs font-bold text-[#6C3BFF] hover:underline"
+                  >
+                    Reassign Partner
+                  </button>
+                )
+              ) : (
+                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                  <Lock className="w-3 h-3 text-purple-400" />
+                  Admin Assigned
+                </span>
               )}
             </div>
 

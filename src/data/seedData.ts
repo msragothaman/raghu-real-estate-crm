@@ -24,6 +24,15 @@ export const INITIAL_USERS: User[] = [
     phone: '+91 98403 45678',
     role: 'SALES USER',
     created_at: '2026-01-15T00:00:00Z',
+  },
+  {
+    id: 'u-4',
+    name: 'Prime Realtors Partner',
+    email: 'partner@primerealtors.com',
+    phone: '+91 98410 11223',
+    role: 'CHANNEL PARTNER',
+    partner_id: 'cp-1',
+    created_at: '2026-01-20T00:00:00Z',
   }
 ];
 

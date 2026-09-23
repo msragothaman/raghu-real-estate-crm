@@ -14,6 +14,8 @@ import {
   LogOut,
 } from 'lucide-react';
 
+import { User } from '../../types/crm';
+
 export type TabType =
   | 'dashboard'
   | 'sites'
@@ -30,6 +32,7 @@ interface SidebarProps {
   leadCount: number;
   followupsDueCount: number;
   supabaseConnected: boolean;
+  currentUser?: User;
   onSignOut?: () => void;
 }
 
@@ -40,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   leadCount,
   followupsDueCount,
   supabaseConnected,
+  currentUser,
   onSignOut,
 }) => {
   const navItems = [
@@ -79,16 +83,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Quick Action Button */}
-        <div className="px-4 pt-4 pb-2">
-          <button
-            onClick={onOpenAddLead}
-            className="w-full flex items-center justify-center gap-2 bg-[#6C3BFF] hover:bg-[#7D4EFF] text-white font-bold text-sm py-2.5 px-4 rounded-xl shadow-lg shadow-[#6C3BFF]/40 transition-all active:scale-[0.98] border border-white/15"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>New Lead</span>
-          </button>
-        </div>
+        {/* Quick Action Button - Admin Only */}
+        {currentUser?.role === 'ADMIN' && (
+          <div className="px-4 pt-4 pb-2">
+            <button
+              onClick={onOpenAddLead}
+              className="w-full flex items-center justify-center gap-2 bg-[#6C3BFF] hover:bg-[#7D4EFF] text-white font-bold text-sm py-2.5 px-4 rounded-xl shadow-lg shadow-[#6C3BFF]/40 transition-all active:scale-[0.98] border border-white/15"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>New Lead</span>
+            </button>
+          </div>
+        )}
 
         {/* Navigation Menu */}
         <nav className="p-3 space-y-1">

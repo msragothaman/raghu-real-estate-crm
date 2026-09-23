@@ -11,6 +11,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { TabType } from './Sidebar';
+import { User } from '../../types/crm';
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface MobileNavProps {
   onSelectTab: (tab: TabType) => void;
   onOpenAddLead: () => void;
   leadCount: number;
+  currentUser?: User;
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({
@@ -28,6 +30,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   onSelectTab,
   onOpenAddLead,
   leadCount,
+  currentUser,
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -71,18 +74,20 @@ export const MobileNav: React.FC<MobileNavProps> = ({
             </button>
           </div>
 
-          <div className="p-3">
-            <button
-              onClick={() => {
-                onClose();
-                onOpenAddLead();
-              }}
-              className="w-full flex items-center justify-center gap-2 bg-[#6C3BFF] text-white font-semibold text-sm py-2.5 px-4 rounded-xl"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>New Lead</span>
-            </button>
-          </div>
+          {currentUser?.role === 'ADMIN' && (
+            <div className="p-3">
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenAddLead();
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-[#6C3BFF] text-white font-semibold text-sm py-2.5 px-4 rounded-xl"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>New Lead</span>
+              </button>
+            </div>
+          )}
 
           <nav className="px-3 space-y-1">
             {navItems.map((item) => {

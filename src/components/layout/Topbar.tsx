@@ -127,16 +127,18 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span>Follow-up</span>
           </button>
 
-          <button
-            onClick={() => {
-              soundManager.playClick();
-              onOpenAddSite();
-            }}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border border-[#E5DAFF] hover:bg-[#F5F0FF] text-purple-900 transition-colors"
-          >
-            <Building className="w-3.5 h-3.5 text-[#6C3BFF]" />
-            <span>New Site</span>
-          </button>
+          {currentUser.role === 'ADMIN' && (
+            <button
+              onClick={() => {
+                soundManager.playClick();
+                onOpenAddSite();
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border border-[#E5DAFF] hover:bg-[#F5F0FF] text-purple-900 transition-colors"
+            >
+              <Building className="w-3.5 h-3.5 text-[#6C3BFF]" />
+              <span>New Site</span>
+            </button>
+          )}
         </div>
 
         {/* Role Switcher Pill */}

@@ -12,9 +12,14 @@ import {
   FileSpreadsheet,
   FileText,
   ChevronDown,
+  Shield,
+  ShieldAlert,
+  Lock,
+  Handshake,
 } from 'lucide-react';
 import { useToast } from '../common/Toast';
 import { soundManager } from '../../lib/soundEffects';
+import { dataStore } from '../../lib/dataStore';
 import {
   Lead,
   Site,
@@ -35,6 +40,7 @@ import { AddFollowUpModal } from './AddFollowUpModal';
 import { ImportLeadsModal } from './ImportLeadsModal';
 
 interface LeadManagementViewProps {
+  currentUser?: User;
   leads: Lead[];
   sites: Site[];
   channelPartners: ChannelPartner[];
@@ -51,6 +57,7 @@ interface LeadManagementViewProps {
 }
 
 export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
+  currentUser,
   leads,
   sites,
   channelPartners,
@@ -66,6 +73,11 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
   setSelectedLead,
 }) => {
   const { showToast } = useToast();
+  const activeUser = currentUser || dataStore.getState().currentUser;
+  const isAdmin = activeUser.role === 'ADMIN';
+  const isChannelPartner = activeUser.role === 'CHANNEL PARTNER';
+  const currentPartner = channelPartners.find((cp) => cp.id === activeUser.partner_id);
+
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
@@ -74,6 +86,13 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || 'ALL');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  // If switched to Channel Partner with linked partner_id, focus their assigned leads
+  React.useEffect(() => {
+    if (isChannelPartner && activeUser.partner_id) {
+      setPartnerFilter(activeUser.partner_id);
+    }
+  }, [activeUser.role, activeUser.partner_id]);
 
   // Follow-up scheduling modal state
   const [scheduleLeadId, setScheduleLeadId] = useState<string | null>(null);
@@ -491,44 +510,75 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
                     </div>
                   )}
 
-                  {/* Import Leads Shortcut inside dropdown */}
-                  <div className="mt-2.5 pt-2 border-t border-purple-50">
-                    <button
-                      onClick={() => {
-                        setIsExportMenuOpen(false);
-                        setIsImportModalOpen(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6C3BFF] text-xs font-bold transition-colors"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Import Leads from CSV / Excel</span>
-                    </button>
-                  </div>
+                  {/* Import Leads Shortcut inside dropdown - Admin Only */}
+                  {isAdmin && (
+                    <div className="mt-2.5 pt-2 border-t border-purple-50">
+                      <button
+                        onClick={() => {
+                          setIsExportMenuOpen(false);
+                          setIsImportModalOpen(true);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6C3BFF] text-xs font-bold transition-colors"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Import Leads from CSV / Excel</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
           </div>
 
-          {/* Import Leads Top Action Button */}
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-white hover:bg-purple-50 text-purple-700 border border-[#DDD1FF] hover:border-[#6C3BFF] text-xs sm:text-sm font-bold px-3 py-2.5 rounded-xl shadow-xs transition-all"
-            title="Import leads from CSV, XLSX, or XLS spreadsheet"
-          >
-            <Upload className="w-4 h-4 text-[#6C3BFF]" />
-            <span className="hidden xs:inline">Import Leads</span>
-            <span className="xs:hidden">Import</span>
-          </button>
+          {/* Admin: Import & Add Lead Buttons | Channel Partner: Partner Workspace Badge */}
+          {isAdmin ? (
+            <>
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="inline-flex items-center gap-2 bg-white hover:bg-purple-50 text-purple-700 border border-[#DDD1FF] hover:border-[#6C3BFF] text-xs sm:text-sm font-bold px-3 py-2.5 rounded-xl shadow-xs transition-all"
+                title="Import leads from CSV, XLSX, or XLS spreadsheet"
+              >
+                <Upload className="w-4 h-4 text-[#6C3BFF]" />
+                <span className="hidden xs:inline">Import Leads</span>
+                <span className="xs:hidden">Import</span>
+              </button>
 
-          <button
-            onClick={() => setIsAddLeadOpen(true)}
-            className="inline-flex items-center gap-2 bg-[#6C3BFF] hover:bg-[#5A2FE0] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Lead</span>
-          </button>
+              <button
+                onClick={() => setIsAddLeadOpen(true)}
+                className="inline-flex items-center gap-2 bg-[#6C3BFF] hover:bg-[#5A2FE0] text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Lead</span>
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 text-[#6C3BFF] border border-purple-200 text-xs font-bold shadow-2xs">
+              <Shield className="w-3.5 h-3.5 text-[#6C3BFF]" />
+              <span className="hidden sm:inline">Partner Workspace</span>
+              <span className="sm:hidden">Partner</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Channel Partner Notice Banner */}
+      {isChannelPartner && (
+        <div className="p-3.5 bg-gradient-to-r from-purple-50 via-indigo-50/40 to-purple-50 border border-purple-200/90 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#6C3BFF] text-white flex items-center justify-center shadow-xs shrink-0">
+              <Handshake className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-purple-950">
+                Channel Partner Workspace {currentPartner ? `(${currentPartner.name})` : ''}
+              </p>
+              <p className="text-[11px] text-purple-600 mt-0.5">
+                You have full access to manage assigned leads: update statuses, drag across pipeline stages, conduct follow-ups, and add notes. Adding new leads and re-assigning partners are restricted to Admin.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-3">
@@ -645,15 +695,19 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Excel (.xls)</span>
           </button>
-          <div className="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block" />
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#6C3BFF] hover:text-[#5A2FE0] bg-white hover:bg-purple-50 border border-purple-200 px-2.5 py-1.5 rounded-xl transition-all shadow-2xs"
-            title="Import leads from CSV, XLSX, or XLS spreadsheet"
-          >
-            <Upload className="w-3.5 h-3.5 text-[#6C3BFF]" />
-            <span>Import</span>
-          </button>
+          {isAdmin && (
+            <>
+              <div className="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block" />
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#6C3BFF] hover:text-[#5A2FE0] bg-white hover:bg-purple-50 border border-purple-200 px-2.5 py-1.5 rounded-xl transition-all shadow-2xs"
+                title="Import leads from CSV, XLSX, or XLS spreadsheet"
+              >
+                <Upload className="w-3.5 h-3.5 text-[#6C3BFF]" />
+                <span>Import</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -677,6 +731,7 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
       {/* Lead Detail Slide-over Drawer */}
       {selectedLead && (
         <LeadDetailDrawer
+          currentUser={activeUser}
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
           sites={sites}

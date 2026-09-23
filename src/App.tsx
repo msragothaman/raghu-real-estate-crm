@@ -136,6 +136,7 @@ export const AppContent: React.FC = () => {
           leadCount={storeState.leads.length}
           followupsDueCount={stats.followupsDue}
           supabaseConnected={storeState.supabaseConnected}
+          currentUser={storeState.currentUser}
           onSignOut={handleSignOut}
         />
       </div>
@@ -152,6 +153,7 @@ export const AppContent: React.FC = () => {
         }}
         onOpenAddLead={() => setIsAddLeadOpen(true)}
         leadCount={storeState.leads.length}
+        currentUser={storeState.currentUser}
       />
 
       {/* Main Workspace Area */}
@@ -207,6 +209,7 @@ export const AppContent: React.FC = () => {
 
           {currentTab === 'leads' && (
             <LeadManagementView
+              currentUser={storeState.currentUser}
               leads={storeState.leads}
               sites={storeState.sites}
               channelPartners={storeState.channelPartners}
@@ -225,6 +228,7 @@ export const AppContent: React.FC = () => {
 
           {currentTab === 'partners' && (
             <PartnerManagementView
+              currentUser={storeState.currentUser}
               channelPartners={storeState.channelPartners}
               leads={storeState.leads}
               sites={storeState.sites}

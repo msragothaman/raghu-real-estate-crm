@@ -18,13 +18,16 @@ import {
   ArrowRightLeft,
   Sparkles,
   Info,
+  Lock,
 } from 'lucide-react';
+import { User } from '../../types/crm';
 
 interface PartnerReassignBoardProps {
   leads: Lead[];
   channelPartners: ChannelPartner[];
   sites: Site[];
   onSelectLead: (lead: Lead) => void;
+  currentUser?: User;
 }
 
 export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
@@ -32,8 +35,11 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
   channelPartners,
   sites,
   onSelectLead,
+  currentUser,
 }) => {
   const { showToast } = useToast();
+  const activeUser = currentUser || dataStore.getState().currentUser;
+  const isAdmin = activeUser.role === 'ADMIN';
 
   // Create columns: Channel Partners + Unassigned/Direct Sales
   const partnerColumns = [
@@ -63,6 +69,11 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
     if (!destination) return;
     if (source.droppableId === destination.droppableId) return;
 
+    if (!isAdmin) {
+      showToast('Permission Denied: Only Admin can re-assign leads to Channel Partners.', 'error');
+      return;
+    }
+
     const newPartnerId =
       destination.droppableId === 'direct-inhouse' ? null : destination.droppableId;
     const destPartnerName =
@@ -84,18 +95,30 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
   return (
     <div className="space-y-4">
       {/* Informative Banner */}
-      <div className="p-3.5 bg-gradient-to-r from-[#F3EFFF] via-purple-50/50 to-white border border-[#DDD1FF] rounded-2xl flex items-center justify-between gap-3 text-xs text-purple-900 shadow-xs">
-        <div className="flex items-center gap-2">
-          <ArrowRightLeft className="w-4 h-4 text-[#6C3BFF] shrink-0" />
-          <span className="font-medium">
-            <strong>3D Drag-and-Drop Partner Reassignment:</strong> Drag any customer lead card to another
-            channel partner column to immediately reassign it with live haptic audio feedback.
+      {!isAdmin ? (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-xs text-amber-900 shadow-2xs">
+          <Lock className="w-5 h-5 text-amber-600 shrink-0" />
+          <div>
+            <p className="font-bold">Admin-Only Lead Re-allocation</p>
+            <p className="text-[11px] text-amber-700 mt-0.5">
+              Only Administrators have permission to assign or re-distribute leads across Channel Partners. You can click any lead card to view full customer details and history.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3.5 bg-gradient-to-r from-[#F3EFFF] via-purple-50/50 to-white border border-[#DDD1FF] rounded-2xl flex items-center justify-between gap-3 text-xs text-purple-900 shadow-xs">
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4 text-[#6C3BFF] shrink-0" />
+            <span className="font-medium">
+              <strong>Admin Partner Reassignment:</strong> Drag any customer lead card to another
+              channel partner column to immediately reassign it with live haptic audio feedback.
+            </span>
+          </div>
+          <span className="font-bold text-[#6C3BFF] hidden sm:inline">
+            {leads.length} Total Leads
           </span>
         </div>
-        <span className="font-bold text-[#6C3BFF] hidden sm:inline">
-          {leads.length} Total Leads
-        </span>
-      </div>
+      )}
 
       <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4 pt-1 items-start min-h-[600px] no-scrollbar">
@@ -144,21 +167,23 @@ export const PartnerReassignBoard: React.FC<PartnerReassignBoardProps> = ({
                     >
                       {partnerLeads.length === 0 ? (
                         <div className="h-32 flex flex-col items-center justify-center text-slate-300 text-xs italic border border-dashed border-slate-200 rounded-xl">
-                          <span>Drop leads here</span>
+                          <span>{isAdmin ? 'Drop leads here' : 'No leads assigned'}</span>
                         </div>
                       ) : (
                         partnerLeads.map((lead, index) => {
                           const site = sites.find((s) => s.id === lead.interested_site_id);
 
                           return (
-                            <Draggable key={lead.id} draggableId={lead.id} index={index}>
+                            <Draggable key={lead.id} draggableId={lead.id} index={index} isDragDisabled={!isAdmin}>
                               {(dragProvided, dragSnapshot) => (
                                 <div
                                   ref={dragProvided.innerRef}
                                   {...dragProvided.draggableProps}
                                   {...dragProvided.dragHandleProps}
                                   onClick={() => onSelectLead(lead)}
-                                  className={`bg-white p-3 rounded-xl border border-slate-200 shadow-2xs hover:shadow-lg hover:-translate-y-0.5 hover:border-[#6C3BFF]/40 cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                                  className={`bg-white p-3 rounded-xl border border-slate-200 shadow-2xs hover:shadow-lg hover:-translate-y-0.5 hover:border-[#6C3BFF]/40 ${
+                                    !isAdmin ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
+                                  } transition-all duration-200 ${
                                     dragSnapshot.isDragging
                                       ? 'shadow-[0_20px_45px_rgba(108,59,255,0.35)] rotate-2 scale-105 border-[#6C3BFF] ring-2 ring-[#6C3BFF]/40 z-50'
                                       : ''

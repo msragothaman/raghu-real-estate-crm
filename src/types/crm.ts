@@ -28,6 +28,7 @@ export interface User {
   email: string;
   phone?: string;
   role: UserRole;
+  partner_id?: string | null;
   created_at: string;
 }
 

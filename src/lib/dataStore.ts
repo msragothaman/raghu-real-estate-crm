@@ -363,12 +363,26 @@ class CRMDataStore {
   }
 
   // --- USER ROLE ---
-  public setCurrentUserRole(role: UserRole) {
-    const user = this.state.users.find((u) => u.role === role) || {
-      ...this.state.currentUser,
-      role,
-    };
+  public setCurrentUserRole(role: UserRole, partnerId?: string) {
+    let user = this.state.users.find((u) => u.role === role);
+    if (!user) {
+      user = {
+        ...this.state.currentUser,
+        role,
+        partner_id: partnerId || (role === 'CHANNEL PARTNER' ? 'cp-1' : null),
+      };
+    } else {
+      user = { ...user };
+      if (partnerId && role === 'CHANNEL PARTNER') {
+        user.partner_id = partnerId;
+      }
+    }
     this.state.currentUser = user;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('raghu_crm_current_user', JSON.stringify(this.state.currentUser));
+      }
+    } catch (e) {}
     this.saveState();
   }
 
