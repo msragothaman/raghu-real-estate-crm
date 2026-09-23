@@ -570,6 +570,66 @@ class CRMDataStore {
     return newLead;
   }
 
+  public addLeadsBatch(leadsData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>[]): Lead[] {
+    const timestamp = Date.now();
+    const newLeads: Lead[] = [];
+    const shEntries: LeadStatusHistory[] = [];
+    const pahEntries: PartnerAssignmentHistory[] = [];
+
+    leadsData.forEach((leadData, index) => {
+      const newLead: Lead = {
+        ...leadData,
+        id: `lead-${timestamp}-${index}`,
+        created_at: new Date(timestamp + index).toISOString(),
+        updated_at: new Date(timestamp + index).toISOString(),
+      };
+      newLeads.push(newLead);
+
+      const shEntry: LeadStatusHistory = {
+        id: `sh-${timestamp}-${index}`,
+        lead_id: newLead.id,
+        old_status: undefined,
+        new_status: newLead.status,
+        changed_by: this.state.currentUser.name,
+        changed_at: new Date(timestamp + index).toISOString(),
+      };
+      shEntries.push(shEntry);
+
+      if (newLead.assigned_channel_partner_id) {
+        const pahEntry: PartnerAssignmentHistory = {
+          id: `pah-${timestamp}-${index}`,
+          lead_id: newLead.id,
+          old_partner_id: null,
+          new_partner_id: newLead.assigned_channel_partner_id,
+          changed_by: this.state.currentUser.name,
+          changed_at: new Date(timestamp + index).toISOString(),
+        };
+        pahEntries.push(pahEntry);
+      }
+    });
+
+    this.state.leads.unshift(...newLeads);
+    this.state.statusHistory.unshift(...shEntries);
+    if (pahEntries.length > 0) {
+      this.state.partnerHistory.unshift(...pahEntries);
+    }
+
+    this.saveState();
+
+    const sb = createSupabaseInstance();
+    if (sb && this.state.supabaseConnected) {
+      sb.from('leads').insert(newLeads).then(({ error }) => {
+        if (error) console.warn('Supabase batch leads insert failed:', error);
+      });
+      sb.from('lead_status_history').insert(shEntries).then();
+      if (pahEntries.length > 0) {
+        sb.from('partner_assignment_history').insert(pahEntries).then();
+      }
+    }
+
+    return newLeads;
+  }
+
   public updateLead(leadId: string, updates: Partial<Lead>) {
     const updated = { ...updates, updated_at: new Date().toISOString() };
     this.state.leads = this.state.leads.map((l) =>

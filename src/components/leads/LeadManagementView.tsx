@@ -8,6 +8,7 @@ import {
   Users,
   Sparkles,
   Download,
+  Upload,
   FileSpreadsheet,
   FileText,
   ChevronDown,
@@ -31,6 +32,7 @@ import { LeadTable } from './LeadTable';
 import { LeadDetailDrawer } from './LeadDetailDrawer';
 import { AddLeadModal } from './AddLeadModal';
 import { AddFollowUpModal } from './AddFollowUpModal';
+import { ImportLeadsModal } from './ImportLeadsModal';
 
 interface LeadManagementViewProps {
   leads: Lead[];
@@ -71,6 +73,7 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
   const [partnerFilter, setPartnerFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || 'ALL');
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Follow-up scheduling modal state
   const [scheduleLeadId, setScheduleLeadId] = useState<string | null>(null);
@@ -487,10 +490,35 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
                       </button>
                     </div>
                   )}
+
+                  {/* Import Leads Shortcut inside dropdown */}
+                  <div className="mt-2.5 pt-2 border-t border-purple-50">
+                    <button
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        setIsImportModalOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6C3BFF] text-xs font-bold transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Import Leads from CSV / Excel</span>
+                    </button>
+                  </div>
                 </div>
               </>
             )}
           </div>
+
+          {/* Import Leads Top Action Button */}
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-2 bg-white hover:bg-purple-50 text-purple-700 border border-[#DDD1FF] hover:border-[#6C3BFF] text-xs sm:text-sm font-bold px-3 py-2.5 rounded-xl shadow-xs transition-all"
+            title="Import leads from CSV, XLSX, or XLS spreadsheet"
+          >
+            <Upload className="w-4 h-4 text-[#6C3BFF]" />
+            <span className="hidden xs:inline">Import Leads</span>
+            <span className="xs:hidden">Import</span>
+          </button>
 
           <button
             onClick={() => setIsAddLeadOpen(true)}
@@ -617,6 +645,15 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Excel (.xls)</span>
           </button>
+          <div className="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block" />
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#6C3BFF] hover:text-[#5A2FE0] bg-white hover:bg-purple-50 border border-purple-200 px-2.5 py-1.5 rounded-xl transition-all shadow-2xs"
+            title="Import leads from CSV, XLSX, or XLS spreadsheet"
+          >
+            <Upload className="w-3.5 h-3.5 text-[#6C3BFF]" />
+            <span>Import</span>
+          </button>
         </div>
       </div>
 
@@ -672,6 +709,21 @@ export const LeadManagementView: React.FC<LeadManagementViewProps> = ({
           leads={leads}
           channelPartners={channelPartners}
           defaultLeadId={scheduleLeadId}
+        />
+      )}
+
+      {/* Import Leads Modal */}
+      {isImportModalOpen && (
+        <ImportLeadsModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          sites={sites}
+          channelPartners={channelPartners}
+          onLeadsImported={(importedLeads) => {
+            if (importedLeads.length > 0) {
+              setSelectedLead(importedLeads[0]);
+            }
+          }}
         />
       )}
     </div>
