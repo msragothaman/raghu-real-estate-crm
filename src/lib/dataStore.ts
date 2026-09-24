@@ -182,34 +182,34 @@ class CRMDataStore {
 
       let hasSupabaseData = false;
 
-      if (sitesRes.data && sitesRes.data.length > 0) {
+      if (sitesRes.data) {
         this.state.sites = sitesRes.data;
         hasSupabaseData = true;
       }
-      if (plotsRes.data && plotsRes.data.length > 0) {
+      if (plotsRes.data) {
         this.state.plots = plotsRes.data;
         hasSupabaseData = true;
       }
-      if (leadsRes.data && leadsRes.data.length > 0) {
+      if (leadsRes.data) {
         this.state.leads = leadsRes.data;
         hasSupabaseData = true;
       }
-      if (partnersRes.data && partnersRes.data.length > 0) {
+      if (partnersRes.data) {
         this.state.channelPartners = partnersRes.data;
         hasSupabaseData = true;
       }
-      if (followupsRes.data && followupsRes.data.length > 0) {
+      if (followupsRes.data) {
         this.state.followups = followupsRes.data;
         hasSupabaseData = true;
       }
-      if (notesRes.data && notesRes.data.length > 0) {
+      if (notesRes.data) {
         this.state.notes = notesRes.data;
         hasSupabaseData = true;
       }
-      if (shRes.data && shRes.data.length > 0) {
+      if (shRes.data) {
         this.state.statusHistory = shRes.data;
       }
-      if (phRes.data && phRes.data.length > 0) {
+      if (phRes.data) {
         this.state.partnerHistory = phRes.data;
       }
 
