@@ -12,18 +12,15 @@ import {
   LeadStatus,
   UserRole,
 } from '../types/crm';
-import {
-  INITIAL_USERS,
-  INITIAL_SITES,
-  INITIAL_PLOTS,
-  INITIAL_CHANNEL_PARTNERS,
-  INITIAL_LEADS,
-  INITIAL_FOLLOWUPS,
-  INITIAL_STATUS_HISTORY,
-  INITIAL_PARTNER_HISTORY,
-  INITIAL_NOTES,
-} from '../data/seedData';
 import { getSupabaseCredentials, createSupabaseInstance } from './supabase';
+
+const EMPTY_CURRENT_USER: User = {
+  id: '',
+  name: '',
+  email: '',
+  role: 'ADMIN',
+  created_at: '',
+};
 
 interface CRMState {
   users: User[];
@@ -46,7 +43,7 @@ type Listener = (state: CRMState) => void;
 class CRMDataStore {
   private state: CRMState;
   private listeners: Set<Listener> = new Set();
-  private storageKey = 'raghu_crm_database_v2';
+  private storageKey = 'raghu_crm_database_v3';
 
   constructor() {
     this.state = this.loadInitialState();
@@ -60,16 +57,16 @@ class CRMDataStore {
         if (saved) {
           const parsed = JSON.parse(saved);
           return {
-            users: parsed.users || INITIAL_USERS,
-            currentUser: parsed.currentUser || INITIAL_USERS[0],
-            sites: parsed.sites || INITIAL_SITES,
-            plots: parsed.plots || INITIAL_PLOTS,
-            leads: parsed.leads || INITIAL_LEADS,
-            channelPartners: parsed.channelPartners || INITIAL_CHANNEL_PARTNERS,
-            followups: parsed.followups || INITIAL_FOLLOWUPS,
-            statusHistory: parsed.statusHistory || INITIAL_STATUS_HISTORY,
-            partnerHistory: parsed.partnerHistory || INITIAL_PARTNER_HISTORY,
-            notes: parsed.notes || INITIAL_NOTES,
+            users: parsed.users || [],
+            currentUser: parsed.currentUser || EMPTY_CURRENT_USER,
+            sites: parsed.sites || [],
+            plots: parsed.plots || [],
+            leads: parsed.leads || [],
+            channelPartners: parsed.channelPartners || [],
+            followups: parsed.followups || [],
+            statusHistory: parsed.statusHistory || [],
+            partnerHistory: parsed.partnerHistory || [],
+            notes: parsed.notes || [],
             supabaseConnected: false,
             isSyncing: false,
             isAuthenticated: localStorage.getItem('raghu_crm_auth_session') === 'true',
@@ -81,16 +78,16 @@ class CRMDataStore {
     }
 
     return {
-      users: INITIAL_USERS,
-      currentUser: INITIAL_USERS[0],
-      sites: INITIAL_SITES,
-      plots: INITIAL_PLOTS,
-      leads: INITIAL_LEADS,
-      channelPartners: INITIAL_CHANNEL_PARTNERS,
-      followups: INITIAL_FOLLOWUPS,
-      statusHistory: INITIAL_STATUS_HISTORY,
-      partnerHistory: INITIAL_PARTNER_HISTORY,
-      notes: INITIAL_NOTES,
+      users: [],
+      currentUser: EMPTY_CURRENT_USER,
+      sites: [],
+      plots: [],
+      leads: [],
+      channelPartners: [],
+      followups: [],
+      statusHistory: [],
+      partnerHistory: [],
+      notes: [],
       supabaseConnected: false,
       isSyncing: false,
       isAuthenticated: false,
@@ -342,19 +339,19 @@ class CRMDataStore {
     }
   }
 
-  public resetToDefaultSeedData() {
+  public resetToEmptyWorkspace() {
     localStorage.removeItem(this.storageKey);
     this.state = {
-      users: INITIAL_USERS,
-      currentUser: INITIAL_USERS[0],
-      sites: INITIAL_SITES,
-      plots: INITIAL_PLOTS,
-      leads: INITIAL_LEADS,
-      channelPartners: INITIAL_CHANNEL_PARTNERS,
-      followups: INITIAL_FOLLOWUPS,
-      statusHistory: INITIAL_STATUS_HISTORY,
-      partnerHistory: INITIAL_PARTNER_HISTORY,
-      notes: INITIAL_NOTES,
+      users: [],
+      currentUser: EMPTY_CURRENT_USER,
+      sites: [],
+      plots: [],
+      leads: [],
+      channelPartners: [],
+      followups: [],
+      statusHistory: [],
+      partnerHistory: [],
+      notes: [],
       supabaseConnected: this.state.supabaseConnected,
       isSyncing: false,
       isAuthenticated: this.state.isAuthenticated,

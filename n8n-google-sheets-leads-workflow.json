@@ -1,0 +1,124 @@
+{
+  "name": "Google Sheets to Raghu CRM Leads",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "event": "rowAdded",
+        "sheetName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_GOOGLE_SHEET_TAB_NAME"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID"
+        }
+      },
+      "id": "google-sheets-trigger",
+      "name": "Google Sheets - New Lead Row",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [260, 300],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "REPLACE_WITH_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $json;\n\nconst clean = (value) => value === null || value === undefined ? '' : String(value).trim();\nconst phone = clean(row.phone).replace(/\\D/g, '');\n\nif (!clean(row.name) || !phone) {\n  throw new Error('Each sheet row must contain name and phone');\n}\n\nconst validSources = ['Google', 'Meta', 'WhatsApp', 'Website', 'Referral', 'Channel Partner', 'Other'];\nconst validStatuses = ['NEW', 'CONTACTED', 'FOLLOW UP', 'SITE VISIT', 'INTERESTED', 'NEGOTIATION', 'BOOKED', 'REGISTRATION COMPLETED', 'LOST'];\nconst source = clean(row.source);\nconst status = clean(row.status);\n\nreturn [{\n  json: {\n    id: `lead-sheet-${phone}`,\n    name: clean(row.name),\n    phone,\n    whatsapp: clean(row.whatsapp).replace(/\\D/g, '') || phone,\n    email: clean(row.email) || null,\n    source: validSources.includes(source) ? source : 'Other',\n    campaign: clean(row.campaign) || null,\n    interested_site_id: clean(row.interested_site_id) || null,\n    preferred_plot_size: clean(row.preferred_plot_size) || null,\n    budget: clean(row.budget) || null,\n    purpose: clean(row.purpose) || null,\n    preferred_location: clean(row.preferred_location) || null,\n    status: validStatuses.includes(status) ? status : 'NEW'\n  }\n}];"
+      },
+      "id": "normalize-lead",
+      "name": "Validate and Map Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_SUPABASE_PROJECT_REF.supabase.co/rest/v1/leads?on_conflict=id",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "REPLACE_WITH_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_SUPABASE_SERVICE_ROLE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "supabase-leads-upsert",
+      "name": "Supabase - Upsert Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "content": "## Google Sheet setup\n\nCreate a header row with these exact names:\n\n`name`, `phone`, `whatsapp`, `email`, `source`, `campaign`, `interested_site_id`, `preferred_plot_size`, `budget`, `purpose`, `preferred_location`, `status`\n\nRequired: `name` and `phone`.\n\nValid source values: Google, Meta, WhatsApp, Website, Referral, Channel Partner, Other.\n\nValid status values: NEW, CONTACTED, FOLLOW UP, SITE VISIT, INTERESTED, NEGOTIATION, BOOKED, REGISTRATION COMPLETED, LOST.\n\nAfter importing this workflow, configure the Google Sheets credential, spreadsheet ID, tab name, Supabase project reference, and service-role key.\n\nThe lead ID is generated from the phone number, so repeated rows for the same phone are updated instead of duplicated.",
+        "height": 430,
+        "width": 440,
+        "color": 5
+      },
+      "id": "sheet-setup-note",
+      "name": "Sheet Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 40]
+    }
+  ],
+  "connections": {
+    "Google Sheets - New Lead Row": {
+      "main": [
+        [
+          {
+            "node": "Validate and Map Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Map Lead": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Upsert Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "raghu-crm-google-sheets-leads-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
